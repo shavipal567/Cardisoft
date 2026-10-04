@@ -3,7 +3,6 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, Cell, ResponsiveContainer, Refere
 import { predict, explain } from "./api";
 import type { PredictResponse, ExplainResponse, Target, Patient, Pred } from "./api";
 import { FIELDS, GROUPS, SAMPLE, TARGETS, TARGET_LABELS, riskColor, validate, buildPayload } from "./fields";
-import HeartViewer from "./components/HeartViewer";
 import Logo from "./components/Logo";
 import "./App.css";
 
@@ -238,17 +237,7 @@ export default function App() {
                 })}
               </div>
 
-              <div className="two-col">
-                <HeartViewer
-                  dark={dark}
-                  probabilities={{
-                    LAD: result.vessels.LAD.probability,
-                    LCX: result.vessels.LCX.probability,
-                    RCA: result.vessels.RCA.probability,
-                  }}
-                  selected={target}
-                  onSelect={setTarget}
-                />
+              <div className="flex">
 
                 <div className="card">
                   <h3>What influenced this estimate</h3>
