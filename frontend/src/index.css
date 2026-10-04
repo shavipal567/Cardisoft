@@ -1,0 +1,66 @@
+@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap");
+
+:root {
+  color-scheme: light;
+  --bg1: #e8f3fb;
+  --text: #34495e; --text-strong: #2a4660; --muted: #6d8aa3; --line: #d3e4f0;
+  --card: rgba(255, 255, 255, 0.78);
+  --input: #fbfeff; --input-line: #d5e5ef; --chip: #f7fbfd;
+  --blue-d: #3f8fbf;
+  --green: #d3f0e1; --green-d: #2f7a57;
+  --pink: #fde1ea; --pink-d: #a8425b;
+  --accent: #5aaee0; --accent-2: #7fd1ae;
+  --shadow: 0 6px 24px rgba(80, 140, 180, 0.14);
+  --canvas1: #eaf6fd; --canvas2: #f3faf7;
+  --alert-bg: #fde1ea; --alert-text: #8a3a4e;
+  --label-bg: #ffffff;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg1: #0e1a2b;
+  --text: #dbe6f2; --text-strong: #f1f6fb; --muted: #93a7bd; --line: #2a4262;
+  --card: rgba(22, 36, 56, 0.76);
+  --input: #13213a; --input-line: #2d4663; --chip: #18283f;
+  --blue-d: #7cc0e8;
+  --green: rgba(111, 205, 163, 0.18); --green-d: #8fe0b9;
+  --pink: rgba(240, 140, 170, 0.18); --pink-d: #f5a3bb;
+  --accent: #4f9fd1; --accent-2: #5dbf93;
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.38);
+  --canvas1: #14263d; --canvas2: #12222f;
+  --alert-bg: rgba(240, 140, 170, 0.16); --alert-text: #f5b4c6;
+  --label-bg: #1b2d47;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Nunito", system-ui, "Segoe UI", sans-serif;
+  color: var(--text);
+  line-height: 1.5;
+  background: var(--bg1) url("/wallpaper-light.jpg") center / cover no-repeat fixed;
+  transition: background-color 0.3s;
+}
+
+:root[data-theme="dark"] body {
+  background: var(--bg1) url("/wallpaper-dark.jpg") center / cover no-repeat fixed;
+}
+
+#root {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  text-align: left;
+  border: none;
+  display: block;
+  min-height: 0;
+}
+
+h1, h2, h3, h4 {
+  font-family: inherit;
+  color: var(--text-strong);
+  letter-spacing: normal;
+}
+
+input, button { font: inherit; }

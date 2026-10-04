@@ -1,0 +1,49 @@
+{
+  "CAD": {
+    "target": "CAD", "base_value": 0.42,
+    "features": [
+      { "name": "Age", "value": 58, "contribution": 0.14 },
+      { "name": "Typical Chest Pain", "value": 1, "contribution": 0.12 },
+      { "name": "EF-TTE", "value": 50, "contribution": 0.09 },
+      { "name": "HTN", "value": 1, "contribution": 0.06 },
+      { "name": "DM", "value": 1, "contribution": 0.05 },
+      { "name": "Tinversion", "value": 1, "contribution": 0.04 },
+      { "name": "BP", "value": 140, "contribution": 0.02 },
+      { "name": "HDL", "value": 40, "contribution": -0.03 },
+      { "name": "Current Smoker", "value": 0, "contribution": -0.04 }
+    ]
+  },
+  "LAD": {
+    "target": "LAD", "base_value": 0.55,
+    "features": [
+      { "name": "EF-TTE", "value": 50, "contribution": 0.15 },
+      { "name": "Typical Chest Pain", "value": 1, "contribution": 0.10 },
+      { "name": "Age", "value": 58, "contribution": 0.08 },
+      { "name": "Tinversion", "value": 1, "contribution": 0.07 },
+      { "name": "St Depression", "value": 1, "contribution": 0.05 },
+      { "name": "LDL", "value": 130, "contribution": 0.02 },
+      { "name": "Current Smoker", "value": 0, "contribution": -0.03 }
+    ]
+  },
+  "LCX": {
+    "target": "LCX", "base_value": 0.38,
+    "features": [
+      { "name": "Age", "value": 58, "contribution": 0.05 },
+      { "name": "DM", "value": 1, "contribution": 0.03 },
+      { "name": "EF-TTE", "value": 50, "contribution": -0.04 },
+      { "name": "Typical Chest Pain", "value": 1, "contribution": -0.06 },
+      { "name": "Sex", "value": 1, "contribution": -0.02 }
+    ]
+  },
+  "RCA": {
+    "target": "RCA", "base_value": 0.37,
+    "features": [
+      { "name": "Age", "value": 58, "contribution": 0.09 },
+      { "name": "HTN", "value": 1, "contribution": 0.06 },
+      { "name": "BMI", "value": 27.4, "contribution": 0.04 },
+      { "name": "Tinversion", "value": 1, "contribution": 0.03 },
+      { "name": "HDL", "value": 40, "contribution": 0.02 },
+      { "name": "FBS", "value": 110, "contribution": -0.02 }
+    ]
+  }
+}
