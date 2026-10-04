@@ -1,0 +1,184 @@
+{
+  "target": "lad",
+  "csv_column": "LAD",
+  "positive_label": "Stenotic",
+  "n_train": 242,
+  "n_test": 61,
+  "pos_rate_train": 0.5826446280991735,
+  "pos_rate_test": 0.5901639344262295,
+  "best": {
+    "model": "rf",
+    "params": {
+      "n_estimators": 400,
+      "max_depth": 8,
+      "min_samples_leaf": 2
+    },
+    "cv_roc_auc": 0.8385333098756744,
+    "cv_f1": 0.8089490889861064
+  },
+  "all_cv_results": [
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 8,
+        "min_samples_leaf": 1
+      },
+      "cv_roc_auc": 0.8220384705606382,
+      "cv_f1": 0.8199883194989811
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 8,
+        "min_samples_leaf": 2
+      },
+      "cv_roc_auc": 0.8301513019000704,
+      "cv_f1": 0.8131049331419506
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": null,
+        "min_samples_leaf": 1
+      },
+      "cv_roc_auc": 0.8291508327468918,
+      "cv_f1": 0.816319102353585
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": null,
+        "min_samples_leaf": 2
+      },
+      "cv_roc_auc": 0.8252351630307295,
+      "cv_f1": 0.8036458014417324
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 8,
+        "min_samples_leaf": 1
+      },
+      "cv_roc_auc": 0.8274466338259441,
+      "cv_f1": 0.8133216528323144
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 8,
+        "min_samples_leaf": 2
+      },
+      "cv_roc_auc": 0.8385333098756744,
+      "cv_f1": 0.8089490889861064
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": null,
+        "min_samples_leaf": 1
+      },
+      "cv_roc_auc": 0.836728536242083,
+      "cv_f1": 0.8144910462943249
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": null,
+        "min_samples_leaf": 2
+      },
+      "cv_roc_auc": 0.8336013370865588,
+      "cv_f1": 0.8094026284348865
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 3,
+        "learning_rate": 0.05
+      },
+      "cv_roc_auc": 0.8180143091719447,
+      "cv_f1": 0.7997902005484521
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 3,
+        "learning_rate": 0.1
+      },
+      "cv_roc_auc": 0.8189836969270466,
+      "cv_f1": 0.7946170983013088
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 4,
+        "learning_rate": 0.05
+      },
+      "cv_roc_auc": 0.8218748533896317,
+      "cv_f1": 0.7997902005484521
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 4,
+        "learning_rate": 0.1
+      },
+      "cv_roc_auc": 0.817778559699742,
+      "cv_f1": 0.7773856982315017
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 3,
+        "learning_rate": 0.05
+      },
+      "cv_roc_auc": 0.8154832277738683,
+      "cv_f1": 0.8016903286532276
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 3,
+        "learning_rate": 0.1
+      },
+      "cv_roc_auc": 0.820008210180624,
+      "cv_f1": 0.7903789605841346
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 4,
+        "learning_rate": 0.05
+      },
+      "cv_roc_auc": 0.8190282664790054,
+      "cv_f1": 0.7942727949199044
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 4,
+        "learning_rate": 0.1
+      },
+      "cv_roc_auc": 0.8173545625146609,
+      "cv_f1": 0.7703003079882167
+    }
+  ],
+  "random_state": 42,
+  "test_size": 0.2,
+  "git_hash": "d53297c"
+}

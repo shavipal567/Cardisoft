@@ -1,0 +1,184 @@
+{
+  "target": "rca",
+  "csv_column": "RCA",
+  "positive_label": "Stenotic",
+  "n_train": 242,
+  "n_test": 61,
+  "pos_rate_train": 0.3760330578512397,
+  "pos_rate_test": 0.3770491803278688,
+  "best": {
+    "model": "rf",
+    "params": {
+      "n_estimators": 200,
+      "max_depth": 8,
+      "min_samples_leaf": 2
+    },
+    "cv_roc_auc": 0.7343274853801169,
+    "cv_f1": 0.46587813620071683
+  },
+  "all_cv_results": [
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 8,
+        "min_samples_leaf": 1
+      },
+      "cv_roc_auc": 0.7128139344777715,
+      "cv_f1": 0.38274456355657693
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 8,
+        "min_samples_leaf": 2
+      },
+      "cv_roc_auc": 0.7343274853801169,
+      "cv_f1": 0.46587813620071683
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": null,
+        "min_samples_leaf": 1
+      },
+      "cv_roc_auc": 0.7164928001006099,
+      "cv_f1": 0.2656615526180744
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": null,
+        "min_samples_leaf": 2
+      },
+      "cv_roc_auc": 0.7180123247186065,
+      "cv_f1": 0.42573160173160174
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 8,
+        "min_samples_leaf": 1
+      },
+      "cv_roc_auc": 0.7148399673017669,
+      "cv_f1": 0.3942970822281167
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 8,
+        "min_samples_leaf": 2
+      },
+      "cv_roc_auc": 0.7220700496761617,
+      "cv_f1": 0.4524285206821358
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": null,
+        "min_samples_leaf": 1
+      },
+      "cv_roc_auc": 0.7086467962019745,
+      "cv_f1": 0.26792593446866314
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": null,
+        "min_samples_leaf": 2
+      },
+      "cv_roc_auc": 0.7122838458152551,
+      "cv_f1": 0.41780239173342626
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 3,
+        "learning_rate": 0.05
+      },
+      "cv_roc_auc": 0.6610652078224234,
+      "cv_f1": 0.4825642340632853
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 3,
+        "learning_rate": 0.1
+      },
+      "cv_roc_auc": 0.659478085895743,
+      "cv_f1": 0.5060662543421165
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 4,
+        "learning_rate": 0.05
+      },
+      "cv_roc_auc": 0.6664623027101805,
+      "cv_f1": 0.4681611819692314
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 4,
+        "learning_rate": 0.1
+      },
+      "cv_roc_auc": 0.6558108532981197,
+      "cv_f1": 0.46932843472317154
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 3,
+        "learning_rate": 0.05
+      },
+      "cv_roc_auc": 0.6561548135571905,
+      "cv_f1": 0.48225535375440504
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 3,
+        "learning_rate": 0.1
+      },
+      "cv_roc_auc": 0.6729723951455701,
+      "cv_f1": 0.4982584465343086
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 4,
+        "learning_rate": 0.05
+      },
+      "cv_roc_auc": 0.6716267370936301,
+      "cv_f1": 0.4627994227994228
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 4,
+        "learning_rate": 0.1
+      },
+      "cv_roc_auc": 0.6703980381060177,
+      "cv_f1": 0.49829121329121334
+    }
+  ],
+  "random_state": 42,
+  "test_size": 0.2,
+  "git_hash": "d53297c"
+}
