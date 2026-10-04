@@ -1,0 +1,8 @@
+{
+  "cad": { "prediction": 1, "probability": 0.73 },
+  "vessels": {
+    "LAD": { "prediction": 1, "probability": 0.81 },
+    "LCX": { "prediction": 0, "probability": 0.34 },
+    "RCA": { "prediction": 1, "probability": 0.56 }
+  }
+}
