@@ -1,0 +1,82 @@
+site_name: Cardisoft
+site_description: Cardiovascular risk visualization & prediction — technical documentation
+site_author: Cardisoft
+copyright: Cardisoft — research prototype. Predictions are not a medical diagnosis.
+docs_dir: docs
+site_dir: site
+# Pointer stub for GitHub rendering; the site home is index.md.
+exclude_docs: README.md
+use_directory_urls: true
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  logo: assets/img/logo.svg
+  favicon: assets/img/favicon.svg
+  palette:
+    - scheme: default
+      primary: teal
+      accent: red
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      accent: red
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: Roboto Mono
+  features:
+    - announce.dismiss
+    - content.code.copy
+    - content.tabs.link
+    - navigation.expand
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - toc.follow
+
+extra_css:
+  - assets/css/extra.css
+
+markdown_extensions:
+  - tables
+  - admonition
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: ["."]
+          options:
+            show_source: false
+            members_order: source
+            show_if_no_docstring: true
+
+nav:
+  - Home: index.md
+  - Problem Formulation: problem-formulation.md
+  - Dataset: dataset.md
+  - Preprocessing: preprocessing.md
+  - Feature Engineering: feature-engineering.md
+  - Multimodal Fusion: multimodal-fusion.md
+  - Models: models.md
+  - Evaluation: evaluation.md
+  - Explainability: explainability.md
+  - Visualization: visualization.md
+  - API: api.md
+  - API Reference:
+      - Training: api-reference/training.md
+      - Backend: api-reference/backend.md
+  - Engineering Decisions: engineering-decisions.md
+
+strict: true

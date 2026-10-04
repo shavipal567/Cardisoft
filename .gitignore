@@ -24,5 +24,8 @@ ENV/
 *.pem
 *.key
 
+# Docs build output (regenerate with: mkdocs build --strict)
+site/
+
 # NOTE: training/artifacts/*.joblib are intentionally TRACKED —
 # backend/ loads them at startup. Do not ignore them here.
