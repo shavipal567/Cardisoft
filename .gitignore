@@ -1,1 +1,28 @@
-.vscode
+# Editors / IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Virtual envs
+venv/
+.venv/
+env/
+ENV/
+
+# Secrets / local config (never commit)
+.env
+*.pem
+*.key
+
+# NOTE: training/artifacts/*.joblib are intentionally TRACKED —
+# backend/ loads them at startup. Do not ignore them here.

@@ -1,0 +1,184 @@
+{
+  "target": "lcx",
+  "csv_column": "LCX",
+  "positive_label": "Stenotic",
+  "n_train": 242,
+  "n_test": 61,
+  "pos_rate_train": 0.3925619834710744,
+  "pos_rate_test": 0.39344262295081966,
+  "best": {
+    "model": "rf",
+    "params": {
+      "n_estimators": 400,
+      "max_depth": null,
+      "min_samples_leaf": 1
+    },
+    "cv_roc_auc": 0.7278826376285541,
+    "cv_f1": 0.45501451294554746
+  },
+  "all_cv_results": [
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 8,
+        "min_samples_leaf": 1
+      },
+      "cv_roc_auc": 0.7128614640048396,
+      "cv_f1": 0.47046052452059123
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 8,
+        "min_samples_leaf": 2
+      },
+      "cv_roc_auc": 0.7226255293405929,
+      "cv_f1": 0.5136904761904761
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": null,
+        "min_samples_leaf": 1
+      },
+      "cv_roc_auc": 0.714767090139141,
+      "cv_f1": 0.4613727186585918
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": null,
+        "min_samples_leaf": 2
+      },
+      "cv_roc_auc": 0.7194555353901997,
+      "cv_f1": 0.5215860215053764
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 8,
+        "min_samples_leaf": 1
+      },
+      "cv_roc_auc": 0.7192498487598306,
+      "cv_f1": 0.4790132374114576
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 8,
+        "min_samples_leaf": 2
+      },
+      "cv_roc_auc": 0.7160556563823351,
+      "cv_f1": 0.5181950122550789
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": null,
+        "min_samples_leaf": 1
+      },
+      "cv_roc_auc": 0.7278826376285541,
+      "cv_f1": 0.45501451294554746
+    },
+    {
+      "model": "rf",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": null,
+        "min_samples_leaf": 2
+      },
+      "cv_roc_auc": 0.7147368421052631,
+      "cv_f1": 0.5024089635854342
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 3,
+        "learning_rate": 0.05
+      },
+      "cv_roc_auc": 0.7062552934059286,
+      "cv_f1": 0.556284127930987
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 3,
+        "learning_rate": 0.1
+      },
+      "cv_roc_auc": 0.7031457955232909,
+      "cv_f1": 0.5631705433021222
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 4,
+        "learning_rate": 0.05
+      },
+      "cv_roc_auc": 0.7169993950393225,
+      "cv_f1": 0.576544172673205
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 200,
+        "max_depth": 4,
+        "learning_rate": 0.1
+      },
+      "cv_roc_auc": 0.7032909860859045,
+      "cv_f1": 0.5556704556704556
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 3,
+        "learning_rate": 0.05
+      },
+      "cv_roc_auc": 0.7094373865698728,
+      "cv_f1": 0.5650691177006967
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 3,
+        "learning_rate": 0.1
+      },
+      "cv_roc_auc": 0.7047912885662433,
+      "cv_f1": 0.5854544150519383
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 4,
+        "learning_rate": 0.05
+      },
+      "cv_roc_auc": 0.716261343012704,
+      "cv_f1": 0.5867458028748352
+    },
+    {
+      "model": "xgb",
+      "params": {
+        "n_estimators": 400,
+        "max_depth": 4,
+        "learning_rate": 0.1
+      },
+      "cv_roc_auc": 0.7097761645493044,
+      "cv_f1": 0.5601443072031307
+    }
+  ],
+  "random_state": 42,
+  "test_size": 0.2,
+  "git_hash": "d53297c"
+}
