@@ -121,7 +121,7 @@ export default function App() {
   const axis = dark ? "#93a7bd" : "#7b8da1";
 
   return (
-    <div className="page">\
+    <div className="page">
       <p className="quote">💙 {quote}</p>
       <header className="top">
           
