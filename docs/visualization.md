@@ -1,8 +1,10 @@
-# Visualization (3D + dashboard) — specified, deferred
+# Visualization (3D + dashboard) — implemented
 
-Status: **no frontend exists in this repo** (scope decision). This page records
-the binding contract from PROBLEM.md §§12–18 so a future frontend implements
-it correctly on the first pass against the already-stable API.
+Status: **implemented**. `frontend/src/components/HeartViewer.tsx` (procedural
+heart + LAD/LCX/RCA tube meshes, R3F) is mounted in `frontend/src/App.tsx` and
+implements the binding contract from PROBLEM.md §§12–18 against the
+already-stable API. It renders below the risk cards after `/predict`, with vessel
+click-to-select synced to the risk/explanation target.
 
 ## Required capabilities
 
@@ -33,6 +35,6 @@ layer as interpretive context in the UI copy.
   contributions for the selected vessel's panel.
 - `GET /health` → status + disclaimer text.
 
-Suggested build order when scoped in: procedural vessel meshes first (no
-license risk, exact LAD/LCX/RCA correspondence), licensed `.glb` asset only if
+Implementation notes: procedural vessel meshes (no license risk, exact
+LAD/LCX/RCA correspondence). A licensed `.glb` asset remains optional only if
 attribution/licensing is documented (§13).

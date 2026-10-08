@@ -2,4 +2,6 @@ pandas==2.2.3
 numpy==1.26.4
 scikit-learn==1.7.2
 xgboost==3.2.0
+lightgbm==4.6.0
+catboost==1.2.10
 joblib==1.5.3

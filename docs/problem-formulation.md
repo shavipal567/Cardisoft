@@ -38,11 +38,12 @@ Weights: predictive performance 30%, 3D visualization 25%, interpretability
    stenosis probability" — never "plaque found here" (§15, §27).
 3. **Explanations ≠ causality**: SHAP contributions describe the model, not the
    patient's biology (§20).
-4. **Disclaimer visible** in the interface (§26); carried by `GET /health` until
-   a frontend exists.
+4. **Disclaimer visible** in the interface (§26); also carried by `GET /health`.
 
 ## Current scope status
 
 Built: leakage-safe training (`training/`), FastAPI predict/explain
-(`backend/`), evaluation + metrics. Deferred per scope decision: 3D frontend
-and dashboard (contract documented in [visualization](visualization.md)).
+(`backend/`), evaluation + metrics, React dashboard with patient form, PDF
+report scanner, risk cards, per-vessel explanations, and the schematic 3D
+heart (`frontend/`). See [visualization](visualization.md) for the 3D
+contract.

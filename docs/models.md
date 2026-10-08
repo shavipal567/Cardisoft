@@ -22,7 +22,24 @@ shared preprocessing, shared protocol.
 XGBoost is explicitly allowed (PROBLEM.md §8); it was fairly compared and lost
 on CV AUC for all four heads in this run.
 
-## Winners (full CV tables in `artifacts/<target>/metadata.json`)
+## Winners v2 (10 repeats × 5 folds; full tables in `artifacts/<target>/metadata.json`)
+
+| Head | Winner | Mean CV AUC | Mean CV F1 | Stability Jaccard | Artifact size |
+|---|---|---|---|---|---|
+| cad | CatBoost native, depth 4 / lr 0.05 / l2 3 | 0.9273±0.030 | 0.9074 | 0.85 | — |
+| lad | RF 400/None/leaf2 | 0.8428±0.058 | 0.8181 | 0.83 | — |
+| lcx | RF 400/None/leaf2 | 0.7400±0.060 | 0.5103 | 0.66 | — |
+| rca | RF 400/8/leaf2 | 0.7067±0.068 | 0.4377 | 0.77 | — |
+
+Notes: v1 (single 5-fold) winners were all RF (CAD 0.9272 / LAD 0.8385 /
+LCX 0.7279 / RCA 0.7343). Under 10 repeats, CatBoost-native takes CAD,
+RF holds elsewhere with shifted configs; notably v1's RCA pick (0.7343)
+was seed luck — its honest mean is 0.7067. LightGBM-native, HistGBM and
+the LogReg stack were fairly compared and lost on every head (see
+`artifacts/experiments.csv`). Native track: integer-coded categoricals
+(`build_native_preprocessor`); one-hot track unchanged.
+
+## Winners v1 (superseded, single 5-fold CV)
 
 | Head | Winner | Mean CV AUC | Mean CV F1 | Artifact size |
 |---|---|---|---|---|
