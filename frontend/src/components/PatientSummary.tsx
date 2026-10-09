@@ -1,0 +1,82 @@
+import type { ExplainResponse, Pred, Target } from "../api";
+import { FIELDS } from "../fields";
+import { AREA, band, plainName } from "../plain";
+
+function show(name: string, value: number | string) {
+  const f = FIELDS.find((x) => x.key === name);
+  if (f?.type === "toggle") return value === 1 ? f.on ?? "yes" : f.off ?? "no";
+  return String(value);
+}
+
+export default function PatientSummary(props: {
+  target: Target;
+  pred: Pred;
+  expl?: ExplainResponse;
+  loading: boolean;
+}) {
+  const { target, pred, expl, loading } = props;
+  const pct = Math.round(pred.probability * 100);
+  const signed = expl?.signed !== false;
+  // only inputs the person actually entered
+  const own = expl ? expl.features.filter((f) => !f.assumed) : [];
+  const up = signed
+    ? own.filter((f) => f.contribution > 0.005).sort((a, b) => b.contribution - a.contribution).slice(0, 3)
+    : [];
+  const down = signed
+    ? own.filter((f) => f.contribution < -0.005).sort((a, b) => a.contribution - b.contribution).slice(0, 3)
+    : [];
+  const ranked = !signed ? [...own].sort((a, b) => b.contribution - a.contribution).slice(0, 4) : [];
+
+  return (
+    <div className="card">
+      <h3>What this means</h3>
+      <p className="plain-main">
+        The model estimates a <b>{band(pred.probability)}</b> chance (<b>{pct}%</b>) that {AREA[target]} is
+        narrowed by 50% or more.
+      </p>
+
+      {loading && <p className="note">Loading details...</p>}
+
+      {up.length > 0 && (
+        <>
+          <h4 className="plain-h">Things that made the estimate higher</h4>
+          <ul className="plain-list up-list">
+            {up.map((f) => (
+              <li key={f.name}>
+                {plainName(f.name)} <span>({show(f.name, f.value)})</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {down.length > 0 && (
+        <>
+          <h4 className="plain-h">Things that made the estimate lower</h4>
+          <ul className="plain-list down-list">
+            {down.map((f) => (
+              <li key={f.name}>
+                {plainName(f.name)} <span>({show(f.name, f.value)})</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {ranked.length > 0 && (
+        <>
+          <h4 className="plain-h">What the model paid most attention to</h4>
+          <ul className="plain-list">
+            {ranked.map((f) => (
+              <li key={f.name}>{plainName(f.name)}</li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      <p className="note">
+        This is a computer estimate to help start a conversation, not a diagnosis. Only a doctor can tell
+        you what is happening, usually with scans or other tests. A lower estimate does not mean you are
+        safe, so if you feel unwell, get medical help.
+      </p>
+    </div>
+  );
+}

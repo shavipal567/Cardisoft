@@ -10,7 +10,7 @@ export default function Logo({ size = 56 }: { size?: number }) {
         <img
           src="/stethoscope-bow.png"
           alt=""
-          style={{ position: "absolute", top: -18, right: -38, width: 38, transform: "rotate(14deg)" }}
+          style={{ position: "absolute", top: -13, right: -38, width: 38, transform: "rotate(14deg)" }}
         />
       </div>
     </div>
