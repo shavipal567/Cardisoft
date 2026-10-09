@@ -46,6 +46,10 @@ frontend needs (`/predict` probabilities, per-head `/explain`, disclaimer via
 `/health`), and `visualization.md` pins the mapping and §15 non-localization
 constraint so the UI can't misrepresent the science later.
 
+Update: the frontend has since been built (`frontend/` — form, PDF scanner,
+risk cards, explanations, schematic `HeartViewer` with heartbeat, safety
+copy). The contract above held: no API change was needed.
+
 ## ADR-7: Honest metrics over tuned metrics
 
 Weak LCX/RCA numbers ship as-is; no SMOTE, no test-peeking, no selectively

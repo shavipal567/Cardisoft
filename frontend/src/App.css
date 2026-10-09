@@ -61,6 +61,14 @@
 }
 .btn.primary:disabled { opacity: 0.6; cursor: default; transform: none; }
 .btn.soft { background: var(--pink); color: var(--pink-d); margin-bottom: 14px; }
+.pdf-box { border: 1px dashed var(--input-line); border-radius: 14px; padding: 10px 12px; margin-bottom: 14px; }
+.pdf-btn { display: inline-block; margin-bottom: 6px; }
+.pdf-ok { color: var(--green-d); font-weight: 700; }
+.pdf-hits { list-style: none; margin: 8px 0 0; padding: 0; font-size: 13px; columns: 2; column-gap: 16px; }
+.pdf-hits li { margin-bottom: 3px; break-inside: avoid; }
+.conf { display: inline-block; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; border-radius: 999px; padding: 1px 8px; margin-left: 6px; border: 1px solid var(--input-line); color: var(--muted); }
+.conf.high { background: var(--green); color: var(--green-d); border-color: transparent; }
+.conf.medium { background: var(--chip); color: var(--blue-d); }
 .error { color: #e0607a; font-size: 14px; }
 
 /* ---------- results ---------- */
@@ -88,6 +96,25 @@
 .legend-labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 2px; }
 
 .canvas-wrap { height: 340px; border-radius: 16px; overflow: hidden; background: linear-gradient(180deg, var(--canvas1), var(--canvas2)); }
+.tech-canvas { position: relative; height: 420px; border: 1px solid var(--line); }
+.heart-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.heart-head h3 { margin: 0; }
+.tech-tag { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--muted); border: 1px solid var(--input-line); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+.hud { position: absolute; font-size: 10px; font-weight: 800; letter-spacing: 0.05em; color: var(--text-strong); background: var(--label-bg); border: 1px solid var(--input-line); border-radius: 8px; padding: 4px 9px; opacity: 0.94; pointer-events: none; z-index: 5; }
+.hud-tl { top: 10px; left: 10px; }
+.hud-tr { top: 10px; right: 10px; }
+.hud-br { bottom: 10px; right: 10px; }
+.tlabel { background: transparent; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-align: center; line-height: 1.25; text-shadow: 0 1px 4px var(--label-bg); }
+.tlabel span { display: block; font-weight: 600; letter-spacing: 0.02em; font-size: 10px; }
+.vlabel.tech { min-width: 118px; text-align: center; line-height: 1.3; }
+.vlabel.tech span { display: block; font-size: 10px; font-weight: 600; color: var(--muted); }
+.vlabel.tech .vsub { font-family: ui-monospace, "Roboto Mono", monospace; font-size: 10px; }
+.spec-table { margin-top: 12px; font-size: 13px; }
+.spec-table .mono { font-family: ui-monospace, "Roboto Mono", monospace; font-size: 12px; }
+.spec-table .muted { color: var(--muted); font-size: 12px; }
+.spec-table .sel-row { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 8px; }
+.spec-table tbody tr { cursor: pointer; }
+.swatch { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -2px; margin-right: 6px; border: 1px solid var(--input-line); }
 .vlabel {
   background: var(--label-bg); color: var(--text-strong); padding: 2px 9px; border-radius: 999px;
   font-size: 12px; font-weight: 700; white-space: nowrap; border: 1px solid var(--input-line);

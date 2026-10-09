@@ -8,8 +8,10 @@ predictions + explanations over REST/JSON (PROBLEM.md §§22–23).
 Related docs: `../PROBLEM.md`, `../training/README.md` (artifact contract),
 `./requirements.txt` (`fastapi==0.141.1`, `uvicorn==0.53.0`,
 `pydantic==2.13.5`, plus `scikit-learn==1.7.2` / `xgboost==3.2.0` /
-`pandas==2.2.3` / `numpy==1.26.4` / `joblib==1.5.3` — must match training's
-pins so `model.joblib` unpickles).
+`lightgbm==4.6.0` / `catboost==1.2.10` / `pandas==2.2.3` / `numpy==1.26.4` /
+`joblib==1.5.3` — must match training's pins so `model.joblib` unpickles,
+including the `CatBoostNative` adapter in `training/native_models.py`, which
+resolves via the existing `sys.path` bootstrap).
 
 ## 1. Layout
 
@@ -78,8 +80,12 @@ Response (PROBLEM.md §23 schema):
 }
 ```
 
-Observed examples: empty body `{}` (all defaults) → CAD 0.545 / LAD 0.485 /
-LCX 0.345 / RCA 0.389; a real CAD row from the dataset → CAD **0.73**.
+Observed examples (v2 artifacts): empty body `{}` (schema defaults) → CAD 0.124 /
+LAD 0.493 / LCX 0.296 / RCA 0.391; a real CAD dataset row → CAD **0.945**, a
+real Normal row → CAD **0.011**. (Calling `predict_patient({})` in-process
+with all-`None` inputs is a different input — imputer medians/modes rather
+than schema defaults — and scores higher; the API path above is the
+reference behavior.)
 
 ### `POST /explain`
 
@@ -210,9 +216,9 @@ c.post("/predict", json={}).json()
   `services/*.py` is disturbed; services import training code via
   `<repo>/training` on `sys.path`, and there is intentionally no
   `backend/__init__.py`, so run uvicorn from inside `backend/`.
-- **Unpickle errors after upgrading sklearn/xgboost** → artifact versions must
-  match runtime versions; reinstall from the two `requirements.txt` files
-  (both pin the same ML stack).
+- **Unpickle errors after upgrading sklearn/xgboost/lightgbm/catboost** →
+  artifact versions must match runtime versions; reinstall from the two
+  `requirements.txt` files (both pin the same ML stack).
 
 ## 8. Safety (PROBLEM.md §§26–27)
 

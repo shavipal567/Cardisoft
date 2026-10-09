@@ -8,6 +8,11 @@ import Logo from "./components/Logo";
 import ModelInfo from "./components/ModelInfo";
 import PatientSummary from "./components/PatientSummary";
 import CarePlan from "./components/CarePlan";
+import { extractPdfText } from "./pdf/extractText";
+import { parsePatientFromText } from "./pdf/fieldMap";
+import type { PdfHit } from "./pdf/fieldMap";
+import Logo from "./components/Logo";
+import HeartViewer from "./components/HeartViewer";
 import "./App.css";
 import "./features.css";
 
@@ -76,6 +81,11 @@ export default function App() {
   const [explainLoading, setExplainLoading] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pdfParsing, setPdfParsing] = useState(false);
+  const [pdfFileName, setPdfFileName] = useState("");
+  const [pdfHits, setPdfHits] = useState<PdfHit[]>([]);
+  const [pdfSkipped, setPdfSkipped] = useState<{ key: string; reason: string }[]>([]);
+  const [pdfError, setPdfError] = useState("");
 
   const clinician = view === "clinician";
   const showModel = clinician && tab === "model";
@@ -135,6 +145,36 @@ export default function App() {
     }
   }
 
+  async function onPdfFile(file: File | undefined) {
+    if (!file) return;
+    setPdfParsing(true);
+    setPdfError("");
+    setPdfFileName(file.name);
+    try {
+      const buf = await file.arrayBuffer();
+      const { text, pages, truncated } = await extractPdfText(buf);
+      const parsed = parsePatientFromText(text);
+      if (parsed.hits.length === 0) {
+        setPdfError(`No recognizable values found in ${pages} page(s). Enter values manually.`);
+        setPdfHits([]);
+        setPdfSkipped([]);
+        return;
+      }
+      setValues((p) => ({ ...p, ...parsed.values }));
+      setPdfHits(parsed.hits);
+      setPdfSkipped([
+        ...parsed.skipped.map((s) => ({ key: s.key, reason: s.reason })),
+        ...(truncated ? [{ key: "PDF", reason: `only first ${pages} pages scanned` }] : []),
+      ]);
+    } catch (e) {
+      setPdfError((e as Error).message);
+      setPdfHits([]);
+      setPdfSkipped([]);
+    } finally {
+      setPdfParsing(false);
+    }
+  }
+
   // Fetch the explanation for the selected target (once per target per analysis)
   useEffect(() => {
     if (!result || !analyzed || explanations[target]) return;
@@ -152,6 +192,20 @@ export default function App() {
 
   const predOf = (t: Target): Pred | null =>
     !result ? null : t === "CAD" ? result.cad : result.vessels[t];
+  const probabilities = result
+    ? {
+        LAD: result.vessels.LAD.probability,
+        LCX: result.vessels.LCX.probability,
+        RCA: result.vessels.RCA.probability,
+      }
+    : {};
+  const classifications = result
+    ? {
+        LAD: result.vessels.LAD.prediction,
+        LCX: result.vessels.LCX.prediction,
+        RCA: result.vessels.RCA.prediction,
+      }
+    : {};
 
   const expl = explanations[target];
   const chartData = expl
@@ -208,6 +262,93 @@ export default function App() {
           </button>
           <button className={"tab" + (tab === "model" ? " on" : "")} onClick={() => setTab("model")}>
             Model info
+          <div className="pdf-box">
+            <label className="btn soft pdf-btn" aria-busy={pdfParsing}>
+              {pdfParsing ? "Reading PDF..." : "📄 Scan lab PDF"}
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                hidden
+                disabled={pdfParsing}
+                onChange={(e) => {
+                  void onPdfFile(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <p className="note">Text PDFs only. Parsing runs in your browser — no file is uploaded. Verify values against the original before Analyze.</p>
+            {pdfFileName && !pdfError && pdfHits.length > 0 && (
+              <p className="note pdf-ok">
+                {pdfFileName}: filled {pdfHits.length} field{pdfHits.length === 1 ? "" : "s"} — review below, then press Analyze.
+              </p>
+            )}
+            {pdfError && <p className="error">{pdfError}</p>}
+            {pdfHits.length > 0 && (
+              <ul className="pdf-hits">
+                {pdfHits.map((h) => (
+                  <li key={h.key}>
+                    <b>{h.key}</b> = {h.value}
+                    <span className={"conf " + h.confidence}>{h.confidence}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {pdfSkipped.length > 0 && (
+              <p className="note">Skipped: {pdfSkipped.map((s) => `${s.key} (${s.reason})`).join("; ")}</p>
+            )}
+          </div>
+
+          {GROUPS.map((g) => {
+            const fields = FIELDS.filter((f) => g.keys.includes(f.key));
+            const nums = fields.filter((f) => f.type === "number");
+            const toggles = fields.filter((f) => f.type === "toggle");
+            return (
+              <div className="group" key={g.title}>
+                <h4>{g.title}</h4>
+                {nums.length > 0 && (
+                  <div className="num-grid">
+                    {nums.map((f) => (
+                      <label key={f.key} className="field">
+                        <span>{f.label}</span>
+                        <input
+                          type="number"
+                          value={values[f.key] ?? ""}
+                          min={f.min}
+                          max={f.max}
+                          onChange={(e) =>
+                            setValues((p) => {
+                              const n = { ...p };
+                              if (e.target.value === "") delete n[f.key];
+                              else n[f.key] = Number(e.target.value);
+                              return n;
+                            })
+                          }
+                        />
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {toggles.length > 0 && (
+                  <div className="chips">
+                    {toggles.map((f) => (
+                      <button
+                        type="button"
+                        key={f.key}
+                        className={"chip" + (values[f.key] ? " on" : "")}
+                        aria-pressed={!!values[f.key]}
+                        onClick={() => setValues((p) => ({ ...p, [f.key]: p[f.key] ? 0 : 1 }))}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          <button className="btn primary" onClick={analyze} disabled={loading}>
+            {loading ? "Analyzing..." : "Analyze"}
           </button>
         </nav>
       )}
@@ -315,6 +456,19 @@ export default function App() {
                       ))}
                     </div>
                   )}
+              <div style={{ marginTop: 14 }}>
+                <HeartViewer
+                  probabilities={probabilities}
+                  classifications={classifications}
+                  cadProbability={result.cad.probability}
+                  cadPrediction={result.cad.prediction}
+                  selected={target}
+                  onSelect={setTarget}
+                  dark={dark}
+                />
+              </div>
+
+              <div className="flex">
 
                   {toggles.length > 0 && (
                     <div className="checks">

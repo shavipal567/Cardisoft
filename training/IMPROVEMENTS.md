@@ -3,6 +3,24 @@
 Objective: maximize ROC-AUC (per scope decision). New dependencies allowed:
 LightGBM, CatBoost. Frontend out of scope.
 
+## v2 status (done — 10 repeats × 5 folds, seeds 42–51)
+
+Winners by mean CV AUC (tie-break F1); test on locked 61-row split:
+
+| target | winner | CV AUC | test AUC | v1 test AUC | stability |
+|---|---|---|---|---|---|
+| cad | CatBoost native d4/lr.05/l2=3 | 0.9273±0.030 | 0.893 | 0.877 | 0.85 |
+| lad | RF 400/None/leaf2 | 0.8428±0.058 | 0.843 | 0.839 | 0.83 |
+| lcx | RF 400/None/leaf2 | 0.7400±0.060 | 0.711 | 0.693 | 0.66 |
+| rca | RF 400/8/leaf2 | 0.7067±0.068 | 0.748 | 0.735 | 0.77 |
+
+Takeaways: CatBoost-native takes CAD; RF holds the vessels (LGBM-native,
+HistGBM, LogReg stack fairly compared, lost everywhere —
+`artifacts/experiments.csv`). v1's RCA pick (single-CV 0.7343) was seed
+luck; honest mean 0.7067. LCX recall 0.333→0.458. Done below: §2
+(repeated-CV harness, PR-AUC/Brier, experiments.csv, stability check) and
+§4 candidates. Remaining: §3 chains/CAD-as-OR, §5 features, §6 calibration.
+
 Full per-config CV numbers live in `training/artifacts/<target>/metadata.json`
 (`all_cv_results`: 16 configs × 5 folds per target). This file records winners,
 deltas, and next steps only.
