@@ -1,0 +1,54 @@
+.controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+
+.seg {
+  display: inline-flex; background: var(--card); border: 1px solid var(--line);
+  border-radius: 999px; padding: 3px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.seg button {
+  border: none; background: transparent; color: var(--text); cursor: pointer;
+  padding: 7px 16px; border-radius: 999px; font-weight: 700; font-size: 14px; transition: background 0.2s;
+}
+.seg button.on { background: linear-gradient(90deg, var(--accent), var(--accent-2)); color: #fff; }
+
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.tab {
+  border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer;
+  padding: 8px 18px; border-radius: 999px; font-weight: 700; font-size: 14px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.tab.on { border-color: var(--accent); color: var(--text-strong); box-shadow: var(--shadow); }
+
+.pill.mid { background: rgba(242, 195, 107, 0.28); color: #94650f; }
+:root[data-theme="dark"] .pill.mid { color: #f2c36b; }
+
+.plain-main { font-size: 17px; line-height: 1.55; margin: 0 0 10px; }
+.plain-h { margin: 12px 0 4px; font-size: 14px; color: var(--blue-d); }
+.plain-list { margin: 0 0 6px; padding-left: 20px; font-size: 14px; }
+.plain-list li { margin-bottom: 4px; }
+.plain-list li span { color: var(--muted); }
+.up-list li::marker { color: #e9657a; }
+.down-list li::marker { color: #5aaee0; }
+
+.card table th, .card table td { padding: 8px 10px 8px 0; white-space: nowrap; }
+
+.one-col { margin-top: 14px; }
+.plan-item { display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
+.plan-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 7px; flex: none;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+.plan-text { font-size: 14px; color: var(--text); }
+.urgent { margin-top: 12px; padding: 10px 14px; border-radius: 14px; font-size: 14px;
+  background: var(--alert-bg); color: var(--alert-text); }
+
+/* ---------- checkboxes, radios, name ---------- */
+.checks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; }
+.radios { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 4px 0 8px; }
+.check {
+  display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer;
+  padding: 6px 10px; border-radius: 10px; border: 1px solid var(--input-line); background: var(--chip);
+  color: var(--text); transition: background 0.15s;
+}
+.check input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; flex: none; cursor: pointer; }
+.check:has(input:checked) { background: var(--green); border-color: transparent; color: var(--green-d); font-weight: 700; }
+.field-label { display: block; font-size: 13px; color: var(--muted); margin: 6px 0 2px; }
+.who { margin: 0 0 10px; font-size: 16px; }
+.who b { color: var(--text-strong); }
