@@ -133,8 +133,8 @@ def build_estimator(kind, params, scale_pos):
             random_state=RANDOM_STATE,
         )
     if kind == "lgbm":
-        from lightgbm import LGBMClassifier
-        return LGBMClassifier(
+        from native_models import LGBMArrayClassifier
+        return LGBMArrayClassifier(
             n_estimators=300,
             num_leaves=params["num_leaves"],
             min_child_samples=params["min_child_samples"],
@@ -179,20 +179,23 @@ def make_stack_bases(scale_pos):
     ]
 
 
+def fit_voting(scale_pos, Xt, y, cv=5, seed=RANDOM_STATE):
+    estimators = build_voting_estimators(scale_pos, random_state=seed)
+    best, _ = optimize_voting_weights_and_threshold(
+        estimators, Xt, y, cv=cv, seed=seed,
+    )
+    return VotingClassifier(
+        estimators,
+        weights=best["weights"],
+        threshold=best["threshold"],
+    ).fit(Xt, y)
+
+
 def fit_with_track(kind, params, scale_pos, prep, X_tr, y_tr):
     pre = build_prep(prep).fit(X_tr)
     Xt = pre.transform(X_tr)
     if kind == "vote":
-        estimators = build_voting_estimators(scale_pos)
-        best, _ = optimize_voting_weights_and_threshold(
-            estimators, Xt, y_tr.values, cv=5, seed=RANDOM_STATE,
-        )
-        clf = VotingClassifier(
-            estimators,
-            weights=best["weights"],
-            threshold=best["threshold"],
-        ).fit(Xt, y_tr.values)
-        return pre, clf
+        return pre, fit_voting(scale_pos, Xt, y_tr.values)
     if kind == "stack":
         clf = StackedModel(make_stack_bases(scale_pos)).fit(Xt, y_tr.values)
         return pre, clf
@@ -215,15 +218,7 @@ def repeated_cv_scores(cfg, X_train, y_train, scale_pos, seeds):
             pre = build_prep(cfg["prep"]).fit(X_tr)
             Xt_tr, Xt_va = pre.transform(X_tr), pre.transform(X_va)
             if cfg["model"] == "vote":
-                estimators = build_voting_estimators(scale_pos)
-                best, _ = optimize_voting_weights_and_threshold(
-                    estimators, Xt_tr, y_tr.values, cv=3, seed=seed,
-                )
-                clf = VotingClassifier(
-                    estimators,
-                    weights=best["weights"],
-                    threshold=best["threshold"],
-                ).fit(Xt_tr, y_tr.values)
+                clf = fit_voting(scale_pos, Xt_tr, y_tr.values, cv=3, seed=seed)
             elif cfg["model"] == "stack":
                 clf = StackedModel(make_stack_bases(scale_pos),
                                    random_state=seed).fit(Xt_tr, y_tr.values)
@@ -236,7 +231,7 @@ def repeated_cv_scores(cfg, X_train, y_train, scale_pos, seeds):
                     fit_kwargs[key] = native_cat_indices()
                 clf.fit(Xt_tr, y_tr.values, **fit_kwargs)
             proba = clf.predict_proba(Xt_va)[:, 1]
-            pred = (proba >= 0.5).astype(int)
+            pred = (proba >= getattr(clf, "threshold", 0.5)).astype(int)
             aucs.append(roc_auc_score(y_va, proba))
             f1s.append(f1_score(y_va, pred))
             praucs.append(average_precision_score(y_va, proba))
@@ -260,6 +255,9 @@ def stability_jaccard(kind, params, scale_pos, prep, X_train, y_train, seeds, k=
         if kind == "stack":
             clf = StackedModel(make_stack_bases(scale_pos),
                                random_state=seed).fit(Xt, y_train.values)
+            imp = np.asarray(clf.feature_importances_, dtype=float)
+        elif kind == "vote":
+            clf = fit_voting(scale_pos, Xt, y_train.values, seed=seed)
             imp = np.asarray(clf.feature_importances_, dtype=float)
         else:
             clf = build_estimator(kind, params, scale_pos)

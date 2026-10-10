@@ -1,4 +1,4 @@
-"""Adapters for native-categorical estimators.
+"""Estimator adapters for transformed NumPy matrices.
 
 CatBoost requires categorical columns to have an integer (non-float) dtype,
 but the shared native preprocessor emits a float matrix. :class:`CatBoostNative`
@@ -9,6 +9,20 @@ the saved ``model.joblib`` keeps the standard contract
 
 import numpy as np
 import pandas as pd
+from lightgbm import LGBMClassifier
+
+
+class LGBMArrayClassifier(LGBMClassifier):
+    """Keep LightGBM's generated feature names when predicting from arrays."""
+
+    def predict_proba(self, X, *args, **kwargs):
+        # LightGBM exposes feature_names_in_ even when fit on an unnamed array.
+        # Reuse those names for our positional preprocessor output so sklearn
+        # does not report a spurious feature-name mismatch on every prediction.
+        if (isinstance(X, np.ndarray) and X.ndim == 2
+                and self.__sklearn_is_fitted__()):
+            X = pd.DataFrame(X, columns=self.feature_name_)
+        return super().predict_proba(X, *args, **kwargs)
 
 
 class CatBoostNative:
