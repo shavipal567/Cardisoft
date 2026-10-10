@@ -9,11 +9,13 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "anatomy:register": "node scripts/register-coronaries.mjs",
-    "anatomy:check": "node scripts/register-coronaries.mjs --check"
+    "anatomy:check": "node scripts/register-coronaries.mjs --check",
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.1",
+    "jspdf": "^4.2.1",
     "pdfjs-dist": "^6.4.299",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

@@ -36,9 +36,10 @@ training/
 ├── preprocessing.py   # constants, clean_dataframe(), build_preprocessor() [one-hot],
 │                      # build_native_preprocessor() [integer codes], encode_target(),
 │                      # split_features_target(), get_output_feature_names()
-├── train.py           # repeated-CV comparison (RF/XGB/HGB/LGBM/CatBoost/stack) + artifacts
+├── train.py           # repeated-CV comparison (RF/XGB/HGB/LGBM/CatBoost/stack/vote) + artifacts
 │                      # --targets flag, --repeats flag (default 10)
 ├── stacking.py        # StackedModel: OOF base preds + LogReg meta (one-hot track)
+├── voting.py          # VotingClassifier: soft vote + weight/threshold optimization
 ├── native_models.py    # CatBoostNative adapter (int-cast I/O, same artifact contract)
 ├── evaluate.py        # held-out test metrics -> artifacts/metrics.json
 ├── inference.py       # frozen-artifact loading + predict_patient() / transformed_row()
@@ -123,7 +124,7 @@ Per target: stratified 80/20 split (`test_size=0.2`, `random_state=42` → 242
 train / 61 test) + **repeated** stratified 5-fold CV on the train partition
 (`--repeats`, default 10, seeds 42–51 → 50 scores per config). Preprocessors
 are fitted inside every fold. Per-fold metrics: ROC-AUC, F1, PR-AUC
-(`average_precision`), Brier score. Full search space — 31 configs:
+(`average_precision`), Brier score. Full search space — 32 configs:
 
 - `RandomForestClassifier(class_weight="balanced", n_jobs=-1)` × 8 (one-hot):
   `n_estimators ∈ {200, 400}`, `max_depth ∈ {8, None}`,
@@ -144,6 +145,11 @@ are fitted inside every fold. Per-fold metrics: ROC-AUC, F1, PR-AUC
 - `StackedModel` × 1 (one-hot track): RF + XGB + HGB base models with
   inner 3-fold out-of-fold predictions → `LogisticRegression` meta-learner
   (`stacking.py`).
+- `VotingClassifier` × 1 (voting track): RF + XGB + HGB + LGBM + CatBoost +
+  ElasticNet base models with soft voting. Member weights and decision threshold
+  are grid-searched on out-of-fold CV predictions to maximize F2 (accuracy
+  tiebreak, then recall). Top-4 models by individual CV F2 are selected for
+  the weight search (`voting.py`).
 
 Selection: highest **mean** CV ROC-AUC, tie-break mean CV F1. The winner is
 refit on the full 242-row train split and saved with its preprocessor.
@@ -167,14 +173,15 @@ on every head.
 
 Each `artifacts/<target>/` holds:
 
-- `preprocessor.joblib` — fitted `ColumnTransformer` (train-only fit; one-hot
-  or native track, see `metadata.json` → `best.prep`).
+- `preprocessor.joblib` — fitted preprocessor (train-only fit; one-hot,
+  native, or voting track, see `metadata.json` → `best.prep`).
 - `model.joblib` — fitted classifier (`RandomForest`/`XGB`/`HGB`/`LGBM`/
-  `CatBoostNative`/`StackedModel` — all expose `predict_proba`).
+  `CatBoostNative`/`StackedModel`/`VotingClassifier` — all expose `predict_proba`).
 - `shap_background.npz` — 100 transformed train rows (seeded) for probability-space permutation explanations.
 - `metadata.json` — target/column/positive label, train/test sizes and pos
   rates, winning config, **all per-config CV summaries**, winner stability
-  Jaccard, repeats/seeds, git hash.
+  Jaccard, repeats/seeds, git hash. Voting models also record `threshold` and
+  `voting_weights`.
 
 ## 6. Evaluation (`evaluate.py`)
 
@@ -221,7 +228,8 @@ artifacts. Per-config logs go to stdout; run logs are kept in
 - `predict_patient(features: dict)` — keys are raw CSV column names; missing
   keys become `None` → imputed by the frozen preprocessor. Returns the
   PROBLEM.md §23 schema: `{cad: {prediction, probability}, vessels: {LAD, LCX,
-  RCA}}`, threshold 0.5.
+  RCA}}`. Uses the saved threshold from `metadata.json` (default 0.5 for
+  non-voting models).
 - `transformed_row(features, target="cad")` — returns the transformed vector
   and names: 54 native columns for CAD, 81 one-hot columns for the vessel winners.
 - `available()` — `True` iff all four artifact dirs load.

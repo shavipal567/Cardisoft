@@ -29,9 +29,11 @@ def evaluate_target(key, df):
     d = ARTIFACTS_DIR / key
     prep = joblib.load(d / "preprocessor.joblib")
     model = joblib.load(d / "model.joblib")
+    meta = json.loads((d / "metadata.json").read_text()) if (d / "metadata.json").exists() else {}
+    threshold = meta.get("threshold", 0.5)
     Xt = prep.transform(X_test)
     proba = model.predict_proba(Xt)[:, 1]
-    pred = (proba >= 0.5).astype(int)
+    pred = (proba >= threshold).astype(int)
     tn, fp, fn, tp = confusion_matrix(y_test, pred).ravel().tolist()
     return {
         "target": key,

@@ -1,3 +1,4 @@
+import LoadingStatus from "./LoadingStatus";
 import type { ExplainResponse, Pred, Target } from "../api";
 import { fieldValueLabel } from "../fields";
 import { AREA, band, plainName } from "../plain";
@@ -33,7 +34,7 @@ export default function PatientSummary(props: {
         narrowed by 50% or more.
       </p>
 
-      {loading && <p className="note">Loading details...</p>}
+      {loading && <LoadingStatus label={`Explaining ${target}…`} detail="Preparing a plain-language summary of the contributing inputs." />}
 
       {up.length > 0 && (
         <>

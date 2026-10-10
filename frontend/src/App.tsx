@@ -1,10 +1,19 @@
+import type { HeartViewerHandle } from "./components/HeartViewer";
 import { useEffect, useRef, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Cell, ResponsiveContainer, ReferenceLine } from "recharts";
-import { predict, explain, DEMO_MODE } from "./api";
-import type { PredictResponse, ExplainResponse, Target, Patient, Pred } from "./api";
-import { FIELDS, GROUPS, SAMPLE, TARGETS, TARGET_LABELS, riskColor, validate, buildPayload, fieldValueLabel } from "./fields";
+import { predict, explain, getInputDefaults, DEMO_MODE } from "./api";
+import type { PredictResponse, ExplainResponse, Target, Patient, Pred, InputValues } from "./api";
+import { FIELDS, GROUPS, SAMPLE, TARGETS, TARGET_LABELS, riskColor, fieldError, buildPayload, fieldValueLabel } from "./fields";
 import { PLAIN_LABEL, band, bandClass } from "./plain";
 import Logo from "./components/Logo";
+import { FIELD_INFO } from "./fieldInfo";
+import FieldStatus from "./components/FieldStatus";
+import type { InputSource } from "./components/FieldStatus";
+import LoadingStatus from "./components/LoadingStatus";
+import FieldInfo from "./components/FieldInfo";
+import InputCompleteness from "./components/InputCompleteness";
+import AssessmentTools from "./components/AssessmentTools";
+import type { Assessment } from "./assessment";
 import ModelInfo from "./components/ModelInfo";
 import PatientSummary from "./components/PatientSummary";
 import CarePlan from "./components/CarePlan";
@@ -68,7 +77,19 @@ export default function App() {
   const [quote] = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)]);
   const [view, setView] = useState<"clinician" | "patient">("clinician");
   const [tab, setTab] = useState<"assessment" | "model">("assessment");
+  const [fieldSearch, setFieldSearch] = useState("");
+  const [openGroups, setOpenGroups] = useState<string[]>([GROUPS[0].title]);
+  const [sources, setSources] = useState<Record<string, InputSource>>({});
+  const [resetNotice, setResetNotice] = useState("");
+  const taskEpoch = useRef(0);
+  const inputRef = useRef<HTMLElement>(null);
+  const anatomyRef = useRef<HTMLDivElement>(null);
   const [name, setName] = useState("");
+  const heartViewer = useRef<HeartViewerHandle>(null);
+  const [comparisonBaseline, setComparisonBaseline] = useState<Assessment | null>(null);
+  const [assessment, setAssessment] = useState<Assessment | null>(null);
+  const [inputDefaults, setInputDefaults] = useState<InputValues>();
+  const [defaultsError, setDefaultsError] = useState("");
   const [analyzedName, setAnalyzedName] = useState("");
   const [gender, setGender] = useState<Gender>("");
   const [values, setValues] = useState<Patient>({});
@@ -87,23 +108,42 @@ export default function App() {
   const [pdfSkipped, setPdfSkipped] = useState<{ key: string; reason: string }[]>([]);
   const [pdfError, setPdfError] = useState("");
 
+  useEffect(() => {
+    let cancelled = false;
+    getInputDefaults().then((defaults) => { if (!cancelled) setInputDefaults(defaults); })
+      .catch((error) => { if (!cancelled) setDefaultsError(String(error)); });
+    return () => { cancelled = true; };
+  }, []);
+
   const resultsRef = useRef<HTMLElement>(null);
   const completedFields = Object.keys(buildPayload(values)).length;
   const resultsOutdated = analyzed && FIELDS.some((field) => values[field.key] !== analyzed[field.key]);
 
-  function updateField(key: string, value: string) {
+  const query = fieldSearch.trim().toLowerCase();
+  const matchesField = (key: string, label: string) => !query || `${key} ${label} ${FIELD_INFO[key]?.query ?? ""}`.toLowerCase().includes(query);
+  const matchingCount = FIELDS.filter((field) => matchesField(field.key, field.label)).length;
+  const errors = Object.fromEntries(FIELDS.map((field) => [field.key, fieldError(field, values[field.key])]));
+
+  function markEntered(key: string) {
+    setError(""); setResetNotice("");
+    setSources((previous) => ({ ...previous, [key]: "Entered" }));
+  }
+  function updateField(key: string, value: string, badInput = false) {
+    markEntered(key);
     setValues((previous) => {
       const next = { ...previous };
-      if (value === "") delete next[key];
+      if (badInput) next[key] = NaN;
+      else if (value === "") delete next[key];
       else next[key] = Number(value);
       return next;
     });
   }
 
-  function jumpToResults() {
-    resultsRef.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
-    resultsRef.current?.focus({ preventScroll: true });
+  function jumpTo(element: HTMLElement | null) {
+    element?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
+    element?.focus({ preventScroll: true });
   }
+  function jumpToResults() { jumpTo(resultsRef.current); }
 
   useEffect(() => {
     if (result) jumpToResults();
@@ -122,6 +162,7 @@ export default function App() {
   }, [dark]);
 
   function setSex(v: number | undefined) {
+    markEntered("Sex");
     setValues((p) => {
       const n = { ...p };
       if (v === undefined) delete n.Sex;
@@ -138,37 +179,62 @@ export default function App() {
   }
 
   function loadSample() {
+    setSources(Object.fromEntries(Object.keys(SAMPLE).map((key) => [key, "Sample"])));
+    setError(""); setResetNotice(""); setPdfFileName(""); setPdfHits([]); setPdfSkipped([]); setPdfError("");
     setValues(SAMPLE);
     setGender("Male");
     setName("Sample patient");
   }
 
+  function resetAssessment() {
+    taskEpoch.current += 1;
+    setValues({}); setSources({}); setName(""); setGender(""); setFieldSearch(""); setOpenGroups([GROUPS[0].title]);
+    setResult(null); setAnalyzed(null); setAnalyzedName(""); setAssessment(null); setComparisonBaseline(null);
+    setExplanations({}); setExplainErrors({}); setTarget("CAD"); setError(""); setLoading(false);
+    setPdfParsing(false); setPdfFileName(""); setPdfHits([]); setPdfSkipped([]); setPdfError("");
+    setResetNotice("New assessment started. Patient details, imports, results and comparison have been cleared.");
+    requestAnimationFrame(() => { jumpTo(inputRef.current); document.getElementById("patient-name")?.focus({ preventScroll: true }); });
+  }
+
   async function analyze() {
-    const bad = validate(values);
+    const bad = FIELDS.filter((field) => fieldError(field, values[field.key]));
     if (bad.length) {
-      setError("Please check: " + bad.join(", "));
+      setError(`Check ${bad.length} highlighted field${bad.length === 1 ? "" : "s"} before analyzing.`);
+      setFieldSearch("");
+      setOpenGroups((previous) => [...new Set([...previous, ...GROUPS.filter((group) => group.keys.some((key) => bad.some((field) => field.key === key))).map((group) => group.title)])]);
+      requestAnimationFrame(() => {
+        const input = document.getElementById(`input-${encodeURIComponent(bad[0].key)}`);
+        jumpTo(input);
+      });
       return;
     }
+    const epoch = taskEpoch.current;
+    setResetNotice("");
     const payload = buildPayload(values);
+    const submittedName = name.trim();
     setLoading(true);
     setError("");
     try {
       const r = await predict(payload);
+      if (epoch !== taskEpoch.current) return;
       setResult(r);
       setAnalyzed(payload);
-      setAnalyzedName(name.trim());
+      setAnalyzedName(submittedName);
+      setAssessment({ id: crypto.randomUUID(), createdAt: new Date().toISOString(), name: submittedName,
+        inputs: { ...payload }, result: r, demo: DEMO_MODE });
       setExplanations({});
       setExplainErrors({});
       setTarget("CAD");
     } catch (e) {
-      setError((e as Error).message);
+      if (epoch === taskEpoch.current) setError((e as Error).message);
     } finally {
-      setLoading(false);
+      if (epoch === taskEpoch.current) setLoading(false);
     }
   }
 
   async function onPdfFile(file: File | undefined) {
     if (!file) return;
+    const epoch = taskEpoch.current;
     setPdfParsing(true);
     setPdfError("");
     setPdfHits([]);
@@ -178,6 +244,7 @@ export default function App() {
       const buf = await file.arrayBuffer();
       const { text, pages, truncated } = await extractPdfText(buf);
       const parsed = parsePatientFromText(text);
+      if (epoch !== taskEpoch.current) return;
       if (parsed.hits.length === 0) {
         setPdfError(`No recognizable values found in ${pages} page(s). Enter values manually.`);
         setPdfHits([]);
@@ -185,6 +252,7 @@ export default function App() {
         return;
       }
       setValues((p) => ({ ...p, ...parsed.values }));
+      setSources((previous) => ({ ...previous, ...Object.fromEntries(Object.keys(parsed.values).map((key) => [key, "Imported" as InputSource])) }));
       if (parsed.values.Sex === 0 || parsed.values.Sex === 1) {
         const importedGender = parsed.values.Sex === 1 ? "Male" : "Female";
         setGender((previous) => previous === "Others" ? previous : importedGender);
@@ -195,11 +263,12 @@ export default function App() {
         ...(truncated ? [{ key: "PDF", reason: `only first ${pages} pages scanned` }] : []),
       ]);
     } catch (e) {
+      if (epoch !== taskEpoch.current) return;
       setPdfError((e as Error).message);
       setPdfHits([]);
       setPdfSkipped([]);
     } finally {
-      setPdfParsing(false);
+      if (epoch === taskEpoch.current) setPdfParsing(false);
     }
   }
 
@@ -297,6 +366,11 @@ export default function App() {
         <ModelInfo />
       ) : (
         <main className="assessment">
+          <nav className="mobile-section-nav" aria-label="Assessment sections">
+            <button onClick={() => jumpTo(inputRef.current)}>Inputs</button>
+            <button onClick={jumpToResults} disabled={!result && !loading}>Results</button>
+            <button onClick={() => jumpTo(anatomyRef.current)} disabled={!result}>Anatomy</button>
+          </nav>
           <div className="assessment-heading">
             <div>
               <p className="eyebrow">HEART HEALTH ASSESSMENT</p>
@@ -307,7 +381,7 @@ export default function App() {
           </div>
         <div className="layout">
           {/* ---------- Patient form ---------- */}
-          <section className="card rise patient-form" aria-labelledby="patient-heading">
+          <section id="assessment-inputs" ref={inputRef} tabIndex={-1} className="card rise patient-form" aria-labelledby="patient-heading">
             <div className="form-toolbar">
               <div className="section-heading">
                 <span className="step-number">01</span>
@@ -315,6 +389,7 @@ export default function App() {
               </div>
               <div className="form-tools">
                 {result && <button className="btn soft" onClick={jumpToResults}>View results ↓</button>}
+                <button className="btn soft" onClick={resetAssessment}>Start new assessment</button>
                 <button className="btn soft" onClick={loadSample} disabled={pdfParsing}>Load sample patient</button>
               </div>
             </div>
@@ -361,28 +436,50 @@ export default function App() {
           </details>
             )}
 
+            {resetNotice && <p className="results-update" role="status">{resetNotice}</p>}
+            {pdfParsing && <LoadingStatus label="Reading lab PDF…" detail="Extracting measurements locally. You can review the imported values before analyzing." />}
+            <div className="field-search-bar">
+              <label htmlFor="field-search">Find an input</label>
+              <input id="field-search" type="search" value={fieldSearch} placeholder="Search name or abbreviation, e.g. LDL" onChange={(event) => setFieldSearch(event.target.value)} />
+              {fieldSearch && <button className="btn soft" onClick={() => setFieldSearch("")}>Clear search</button>}
+              <button className="btn soft" disabled={Boolean(query)} onClick={() => setOpenGroups(GROUPS.map((group) => group.title))}>Expand all</button>
+              <button className="btn soft" disabled={Boolean(query)} onClick={() => setOpenGroups([])}>Collapse all</button>
+            </div>
+            <p className="note input-source-key">Entered = your input · Imported = from a PDF · Sample = example data · Default = used when blank</p>
+            {query && <p className="note" role="status">{matchingCount} model inputs match “{fieldSearch}”.</p>}
             <div className="form-sections">
             {GROUPS.map((g, groupIndex) => {
-              const fields = FIELDS.filter((f) => g.keys.includes(f.key));
+              const fields = FIELDS.filter((f) => g.keys.includes(f.key) && matchesField(f.key, f.label));
+              const identityMatch = g.title === "About the patient" && (matchesField("PatientName", "Patient name") || matchesField("Gender", "Gender"));
+              if (!fields.length && !identityMatch) return null;
+              const groupErrors = g.keys.filter((key) => errors[key]).length;
               const nums = fields.filter((f) => f.type === "number");
               const choices = fields.filter((f) => f.type !== "number" && f.key !== "Sex");
               return (
-                <fieldset className="group form-section" key={g.title}>
-                  <legend><span className="group-number">{String(groupIndex + 1).padStart(2, "0")}</span>{g.title}</legend>
-                  {g.title === "About the patient" && (
+                <details className="form-section" key={g.title} open={Boolean(query) || openGroups.includes(g.title)} onToggle={(event) => {
+                  if (query) return;
+                  const isOpen = event.currentTarget.open;
+                  setOpenGroups((previous) => isOpen ? previous.includes(g.title) ? previous : [...previous, g.title] : previous.filter((title) => title !== g.title));
+                }}>
+                  <summary><span><span className="group-number">{String(groupIndex + 1).padStart(2, "0")}</span>{g.title}</span>
+                    <span className="group-completion">{g.keys.filter((key) => values[key] !== undefined).length}/{g.keys.length} supplied{groupErrors > 0 && <b> · {groupErrors} to fix</b>}</span>
+                  </summary>
+                  <fieldset className="group form-section-content" aria-label={g.title}>
+                  {g.title === "About the patient" && (!query || identityMatch || fields.some((field) => field.key === "Sex")) && (
                     <>
-                      <label className="field">
-                        <span>Patient name (optional)</span>
+                      <div className="field">
+                        <div className="field-heading"><label htmlFor="patient-name">Patient name (optional)</label><FieldInfo fieldKey="PatientName" label="Patient name" /></div>
                         <input
+                          id="patient-name"
                           type="text"
                           value={name}
                           maxLength={80}
                           placeholder="Full name"
                           onChange={(e) => setName(e.target.value)}
                         />
-                      </label>
+                      </div>
                       <p className="note">The name stays in this browser and is not sent to the model.</p>
-                      <span className="field-label">Gender (optional)</span>
+                      <div className="field-heading"><span className="field-label">Gender (optional)</span><FieldInfo fieldKey="Gender" label="Gender and model sex" /></div>
                       <div className="radios">
                         {(["", "Male", "Female", "Others"] as const).map((o) => (
                           <label key={o} className="check">
@@ -398,7 +495,7 @@ export default function App() {
                       </div>
                       {gender === "Others" && (
                         <>
-                          <span className="field-label">Sex recorded for the model</span>
+                          <div className="field-heading"><span className="field-label">Sex recorded for the model</span><FieldInfo fieldKey="Sex" label="Sex recorded for the model" /></div>
                           <div className="radios">
                             {(
                               [
@@ -425,56 +522,58 @@ export default function App() {
                           </p>
                         </>
                       )}
+                      <FieldStatus fieldKey="Sex" values={values} source={sources.Sex} defaults={inputDefaults} error={errors.Sex} />
                     </>
                   )}
 
                   {nums.length > 0 && (
                     <div className="num-grid">
                       {nums.map((f) => (
-                        <label key={f.key} className="field">
-                          <span>{f.label}</span>
+                        <div key={f.key} className="field" data-source={values[f.key] === undefined ? "default" : (sources[f.key] ?? "Entered").toLowerCase()}>
+                          <div className="field-heading"><label htmlFor={`input-${encodeURIComponent(f.key)}`}>{f.label}</label><FieldInfo fieldKey={f.key} label={f.label} /></div>
                           <input
                             type="number"
                             step="any"
                             placeholder="Not provided"
+                            id={`input-${encodeURIComponent(f.key)}`}
                             data-feature={f.key}
-                            value={values[f.key] ?? ""}
+                            value={Number.isNaN(values[f.key]) ? "" : values[f.key] ?? ""}
+                            aria-invalid={Boolean(errors[f.key])}
+                            aria-describedby={`input-${encodeURIComponent(f.key)}-source${errors[f.key] ? ` input-${encodeURIComponent(f.key)}-error` : ""}`}
                             min={f.min}
                             max={f.max}
-                            onChange={(e) =>
-                              setValues((p) => {
-                                const n = { ...p };
-                                if (e.target.value === "") delete n[f.key];
-                                else n[f.key] = Number(e.target.value);
-                                return n;
-                              })
-                            }
+                            onChange={(e) => updateField(f.key, e.target.value, e.target.validity.badInput)}
                           />
-                        </label>
+                          <FieldStatus fieldKey={f.key} values={values} source={sources[f.key]} defaults={inputDefaults} error={errors[f.key]} />
+                        </div>
                       ))}
                     </div>
                   )}
                   {choices.length > 0 && (
                     <div className="num-grid">
                       {choices.map((f) => (
-                        <label key={f.key} className="field">
-                          <span>{f.label}</span>
-                          <select data-feature={f.key} value={values[f.key] ?? ""}
+                        <div key={f.key} className="field" data-source={values[f.key] === undefined ? "default" : (sources[f.key] ?? "Entered").toLowerCase()}>
+                          <div className="field-heading"><label htmlFor={`input-${encodeURIComponent(f.key)}`}>{f.label}</label><FieldInfo fieldKey={f.key} label={f.label} /></div>
+                          <select id={`input-${encodeURIComponent(f.key)}`} data-feature={f.key} value={values[f.key] ?? ""}
+                            aria-invalid={Boolean(errors[f.key])} aria-describedby={`input-${encodeURIComponent(f.key)}-source${errors[f.key] ? ` input-${encodeURIComponent(f.key)}-error` : ""}`}
                             onChange={(e) => updateField(f.key, e.target.value)}>
                             <option value="">Not provided</option>
                             {(f.options ?? [{ value: 0, label: "No" }, { value: 1, label: "Yes" }]).map((option) => (
                               <option key={option.value} value={option.value}>{option.label}</option>
                             ))}
                           </select>
-                        </label>
+                          <FieldStatus fieldKey={f.key} values={values} source={sources[f.key]} defaults={inputDefaults} error={errors[f.key]} />
+                        </div>
                       ))}
                     </div>
                   )}
-                </fieldset>
+                  </fieldset>
+                </details>
               );
             })}
             </div>
 
+            <InputCompleteness inputs={values} effective={inputDefaults} defaultsError={defaultsError} />
             <div className="form-actions">
               <div className="form-progress">
                 <b>{completedFields} of {FIELDS.length} inputs provided</b>
@@ -492,13 +591,14 @@ export default function App() {
           </section>
 
           {/* ---------- Results ---------- */}
-          <section className="results-panel" ref={resultsRef} tabIndex={-1} aria-labelledby="results-heading" aria-busy={loading}>
+          <section id="assessment-results" className="results-panel" ref={resultsRef} tabIndex={-1} aria-labelledby="results-heading" aria-busy={loading}>
             <div className="section-heading">
               <span className="step-number">02</span>
               <div><h2 id="results-heading">Assessment results</h2><p className="note">{result ? "Select an estimate to explore its explanation." : "Your assessment will appear here."}</p></div>
             </div>
+            {loading && <LoadingStatus label="Calculating model estimates…" detail={result ? "Updating the assessment. Previous results remain below until the new estimates are ready." : "Processing the submitted inputs for overall CAD and all three arteries."} />}
             {resultsOutdated && <p className="results-update" role="status">Patient measurements have changed. Select Analyze patient to update these results.</p>}
-            {!result ? (
+            {!result ? (loading ? null : (
               <div className="card empty rise">
                 <div className="empty-icon" aria-hidden="true">
                   <svg viewBox="0 0 48 48" fill="none"><path d="M24 40S6 29 6 16a10 10 0 0 1 18-6 10 10 0 0 1 18 6c0 13-18 24-18 24Z" /><path d="M10 24h8l4-9 5 17 4-8h7" /></svg>
@@ -508,13 +608,14 @@ export default function App() {
                 <p>Enter the available patient details and select <b>Analyze patient</b> to see the overall estimate, artery view, and contributing factors.</p>
                 <div className="empty-preview"><span>Overall estimate</span><span>3D artery view</span><span>Model explanation</span></div>
               </div>
-            ) : (
+            )) : (
               <>
                 {analyzedName && (
                   <p className="who">
                     Results for <b>{analyzedName}</b>
                   </p>
                 )}
+
                 <div className="risk-grid">
                   {TARGETS.map((t, i) => {
                     const p = predOf(t)!;
@@ -524,7 +625,7 @@ export default function App() {
                         type="button"
                         aria-pressed={target === t}
                         key={t + pct + view}
-                        className={"card rise risk-card" + (target === t ? " sel" : "")}
+                        className={"card rise risk-card" + (t === "CAD" ? " overall-risk" : "") + (target === t ? " sel" : "")}
                         style={{ animationDelay: `${i * 80}ms` }}
                         onClick={() => setTarget(t)}
                       >
@@ -557,8 +658,8 @@ export default function App() {
                 </div>
 
                 <div className="results-detail-grid">
-                <div className="heart-result">
-                  <HeartViewer
+                <div id="heart-anatomy" ref={anatomyRef} tabIndex={-1} className="heart-result">
+                  <HeartViewer ref={heartViewer}
                     probabilities={probabilities}
                     classifications={classifications}
                     cadProbability={result.cad.probability}
@@ -584,7 +685,7 @@ export default function App() {
                           </span>
                         </p>
                       )}
-                      {explainLoading && <p className="note">Loading explanation...</p>}
+                      {explainLoading && <LoadingStatus label={`Explaining ${TARGET_LABELS[target]}…`} detail="Calculating which inputs contributed to this estimate." />}
                       {expl && (
                         <>
                           <div style={{ height: 300 }}>
@@ -625,6 +726,11 @@ export default function App() {
                 </div>
 
                 </div>
+
+                {assessment && <AssessmentTools key={assessment.id} captureHeart={() => {
+                  if (!heartViewer.current) throw new Error("The 3D heart is not available. Please wait for the viewer to load.");
+                  return heartViewer.current.capturePng();
+                }} current={assessment} explanations={explanations} outdated={Boolean(resultsOutdated)} baseline={comparisonBaseline} setBaseline={setComparisonBaseline} />}
 
                 {analyzed && <CarePlan patient={analyzed} result={result} clinician={clinician} />}
 

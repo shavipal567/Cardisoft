@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / "backend"), str(ROOT / "training")]
 from main import app
 from schemas import PatientInput
-from inference import predict_patient, transformed_row
+from inference import predict_patient, transformed_row, get_artifact
 from preprocessing import ALL_INPUT_FEATURES, LEAKAGE_COLUMNS
 from services.explainer import explain_patient, feature_groups, permutation_contributions
 from model_info import model_info
@@ -125,7 +125,20 @@ class ApiTests(unittest.TestCase):
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as c:
                 self.assertTrue((await c.get('/health')).json()['artifacts_loaded'])
                 self.assertEqual((await c.get('/model-info')).status_code, 200)
-                self.assertEqual((await c.post('/predict', json={})).status_code, 200)
+                defaults = (await c.get('/input-defaults')).json()
+                self.assertEqual(defaults, PatientInput().to_feature_dict())
+                self.assertEqual(defaults, json.loads((ROOT / 'frontend/public/input-defaults.json').read_text()))
+                empty = (await c.post('/predict', json={})).json()['context']
+                self.assertEqual(empty['effective_inputs'], defaults)
+                self.assertEqual(set(empty['defaulted_inputs']), set(defaults))
+                supplied = (await c.post('/predict', json={'Age': 70, 'DM': 0, 'Sex': 'Female'})).json()['context']
+                self.assertNotIn('DM', supplied['defaulted_inputs'])
+                self.assertNotIn('Sex', supplied['defaulted_inputs'])
+                self.assertEqual(supplied['effective_inputs']['Age'], 70)
+                self.assertEqual(supplied['effective_inputs']['Sex'], 'Female')
+                for key, model in supplied['models'].items():
+                    self.assertEqual(model['version'], get_artifact(key.lower())['version'])
+                    self.assertEqual(len(model['version']), 64)
                 for body in [{'Age': -10}, {'Sex': 'invalid'}, {'DM': 4}, {'Cath': 'CAD'}]:
                     self.assertEqual((await c.post('/predict', json=body)).status_code, 422)
                     self.assertEqual((await c.post('/explain', json={'features': body})).status_code, 422)
@@ -138,6 +151,7 @@ class ApiTests(unittest.TestCase):
                 e = await c.post('/explain', json={'target': 'cad', 'top_k': 3})
                 self.assertEqual(e.status_code, 200)
                 self.assertEqual(e.json()['method'], 'permutation_shapley')
+                self.assertEqual(e.json()['model_version'], get_artifact('cad')['version'])
         asyncio.run(check())
 
 

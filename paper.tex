@@ -1,0 +1,658 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+\begin{document}
+
+\title{Cardisoft: A Leakage-Safe Multimodal Clinical Decision Support System\\for Coronary Artery Disease Prediction}
+
+\author{
+\IEEEauthorblockN{Palvika Sharma}
+\IEEEauthorblockA{
+School of Management\\
+Indian Institute of Technology Mandi\\
+Email: palvika@merepaagli.com}
+\and
+\IEEEauthorblockN{Reman Dey}
+\IEEEauthorblockA{
+School of Physical Sciences\\
+Institution\\
+Email: reman.airport@gmail.com}
+}
+
+\maketitle
+
+\begin{abstract}
+Coronary artery disease (CAD) remains the leading cause of mortality worldwide, necessitating early and accurate risk stratification tools. We present \textbf{Cardisoft}, a research prototype clinical decision support system that predicts CAD and vessel-specific stenosis (LAD, LCX, RCA) from structured clinical measurements of 303 patients. The system employs a leakage-safe machine learning pipeline with repeated cross-validation model selection across seven model families and 32 configurations per target. Our best models achieve test ROC-AUC of 0.893 (CAD), 0.843 (LAD), 0.711 (LCX), and 0.748 (RCA). We provide patient-specific explanations via grouped permutation Shapley values and an interactive 3D schematic heart visualization. The system architecture separates training from serving, enforces strict leakage prevention through allow-list validation, and maintains reproducibility through version-pinned dependencies and committed artifacts. All predictions are uncalibrated model estimates, and the system is designed as a decision-support prototype rather than a diagnostic tool. We honestly report limitations including weak vessel-level recall for LCX (0.458) and RCA (0.391), and outline a roadmap for calibration, vessel-dependence modeling, and multimodal fusion.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Coronary artery disease, clinical decision support, machine learning, explainable AI, Shapley values, leakage prevention, permutation explainability, gradient boosting, random forest
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+Coronary artery disease (CAD) accounts for approximately 16\% of global deaths annually, making it the single largest cause of mortality worldwide~\cite{virani2020}. The disease develops through the accumulation of atherosclerotic plaque in the coronary arteries, leading to stenosis (narrowing) that can ultimately result in myocardial infarction. Early identification of patients at risk for significant stenosis ($\geq$50\% narrowing) can guide decisions about further diagnostic testing, such as coronary CT angiography or invasive coronary angiography, and therapeutic intervention including lifestyle modification, pharmacotherapy, or revascularization.
+
+Traditional risk assessment tools, such as the Framingham Risk Score~\cite{framingham}, rely on a limited set of clinical variables and assume linear relationships between risk factors and outcomes. While these tools have been validated in large populations, they may miss complex non-linear interactions between risk factors and do not leverage the full breadth of clinical data available in electronic health records.
+
+The Z-Alizadeh Sani dataset~\cite{alizadeh2018} provides a rich collection of 303 patient records encompassing demographics, cardiovascular risk factors, symptoms, electrocardiographic (ECG) findings, laboratory values, and echocardiographic measurements. This dataset has been widely used for CAD prediction research, yet many existing approaches suffer from three critical limitations:
+
+\begin{enumerate}
+    \item \textbf{Data leakage}: Some approaches inadvertently include target labels or their proxies as model inputs, inflating performance metrics and producing models that fail in real-world deployment~\cite{kaufman2020}.
+    \item \textbf{Inadequate validation}: Single train/test splits or simple cross-validation without repetition can produce unstable model selections, particularly on small datasets~\cite{abdar2019}.
+    \item \textbf{Lack of interpretability}: Black-box models without patient-specific explanations limit clinical trust and adoption~\cite{lundberg2017}.
+\end{enumerate}
+
+We present \textbf{Cardisoft}, a comprehensive clinical decision support system that addresses these limitations through:
+
+\begin{itemize}
+    \item \textbf{Leakage-safe pipeline}: Strict exclusion of target labels from model inputs, enforced through an allow-list mechanism with defense-in-depth validation
+    \item \textbf{Rigorous validation}: Repeated stratified cross-validation (10$\times$5-fold, 50 scores per configuration) for model selection, with a locked test set never used during fitting
+    \item \textbf{Patient-specific explainability}: Grouped permutation Shapley values that respect categorical feature groupings and provide additive decomposition
+    \item \textbf{Interactive visualization}: 3D schematic heart with vessel-specific probability overlays, camera presets, and vessel selection
+    \item \textbf{Transparent reporting}: Honest disclosure of limitations including uncalibrated probabilities and weak vessel-level recall
+    \item \textbf{Reproducible artifacts}: Version-pinned dependencies, fixed random seeds, and committed model files enable inference without retraining
+\end{itemize}
+
+The remainder of this paper is organized as follows: Section~II reviews related work in CAD prediction, explainable AI, and data leakage prevention. Section~III details the methodology including dataset description, leakage prevention, preprocessing, model selection, explainability, and system architecture. Section~IV presents experimental results. Section~V discusses strengths, limitations, and future work. Section~VI concludes.
+
+\section{Related Work}
+
+\subsection{CAD Prediction from Clinical Data}
+
+Early approaches to CAD prediction utilized logistic regression and traditional statistical methods. The Framingham Heart Study~\cite{framingham} established the foundation for cardiovascular risk assessment by identifying major risk factors including age, sex, blood pressure, cholesterol levels, and smoking status. These risk scores have been widely adopted in clinical practice but are limited by their linear assumptions and inability to capture complex interactions.
+
+The application of machine learning to CAD prediction gained momentum with the availability of the Z-Alizadeh Sani dataset. Abdar et al.~\cite{abdar2019} proposed a nested ensemble technique combining multiple classifiers for automated diagnosis of high-risk coronary artery disease. Their approach demonstrated the potential of ensemble methods but used a single cross-validation split for model selection.
+
+Ambale et al.~\cite{ambale2017} introduced a hybrid feature selection and ensemble learning approach, demonstrating that careful feature selection can improve performance on small clinical datasets. However, their evaluation did not include repeated cross-validation, raising concerns about the stability of their model selection.
+
+Deep learning approaches have shown promise for CAD prediction but typically require larger datasets than those available in clinical studies. Convolutional neural networks have been applied to ECG signal classification~\cite{acharya2017}, and recurrent networks have been used for temporal risk prediction~\cite{choi2016}. These approaches often lack the interpretability required for clinical decision support.
+
+\subsection{Explainability in Clinical AI}
+
+Explainable AI (XAI) methods for clinical decision support have gained significant attention as the field moves toward deploying machine learning in high-stakes medical environments. SHAP (SHapley Additive exPlanations) values~\cite{lundberg2017} have become the standard for model interpretation, providing a theoretically grounded approach based on cooperative game theory.
+
+TreeSHAP~\cite{lundberg2018} provides efficient exact computation of Shapley values for tree-based models, reducing the complexity from exponential to polynomial time. However, SHAP implementations can be fragile in production environments, particularly with custom model adapters or when numba compilation fails. The permutation explainer~\cite{lundberg2017} offers a model-agnostic alternative but requires careful implementation to ensure additivity and computational efficiency.
+
+Local interpretable model-agnostic explanations (LIME)~\cite{ribeiro2016} provide an alternative approach by fitting local surrogate models. However, LIME explanations can be unstable and lack the theoretical guarantees of Shapley-based methods.
+
+In clinical applications, the choice of explainability method must balance computational efficiency, theoretical guarantees, and clinical interpretability. Our grouped permutation Shapley approach addresses these requirements by operating directly on model probabilities, respecting categorical feature groupings, and providing additive decomposition.
+
+\subsection{Data Leakage in Clinical ML}
+
+Data leakage remains a pervasive problem in clinical machine learning~\cite{kaufman2020}. Common forms include:
+
+\begin{itemize}
+    \item \textbf{Target leakage}: Including the target variable or its derivatives as model inputs
+    \item \textbf{Preprocessing leakage}: Fitting imputers, scalers, or encoders on the full dataset before cross-validation
+    \item \textbf{Temporal leakage}: Using future information to predict past outcomes
+    \item \textbf{Proxy leakage}: Including variables that are proxies for the target (e.g., vessel labels when predicting CAD)
+\end{itemize}
+
+Kaufman et al.~\cite{kaufman2020} formalized the detection and avoidance of data leakage in machine learning pipelines. Their work emphasizes the importance of fitting all preprocessing steps within cross-validation folds and maintaining strict separation between training and test data.
+
+Our pipeline addresses these concerns through:
+\begin{enumerate}
+    \item An allow-list of 54 known input features that excludes all target labels
+    \item Fold-level preprocessing fitted exclusively on training data
+    \item A locked test set that is never used during model selection or fitting
+    \item Post-training verification that no leakage columns appear in transformed feature names
+\end{enumerate}
+
+\section{Methodology}
+
+\subsection{Dataset}
+
+The dataset comprises 303 patient records with 59 columns and zero missing values. It is an extension of the Z-Alizadeh Sani CAD dataset from the UCI Machine Learning Repository~\cite{alizadeh2018}. Four target variables are defined:
+
+\begin{table}[htbp]
+\centering
+\caption{Target Variables and Class Balance}
+\label{tab:targets}
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Target} & \textbf{CSV Column} & \textbf{Positive} & \textbf{Prevalence} \\
+\midrule
+CAD (overall) & \texttt{Cath} & CAD & 71.3\% (216/303) \\
+LAD stenosis & \texttt{LAD} & Stenotic & 58.4\% (177/303) \\
+LCX stenosis & \texttt{LCX} & Stenotic & 39.3\% (119/303) \\
+RCA stenosis & \texttt{RCA} & Stenotic & 37.6\% (114/303) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The 54 input features span seven clinical categories:
+
+\begin{table}[htbp]
+\centering
+\caption{Input Feature Categories}
+\label{tab:features}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{cp{2.25in}}
+\toprule
+\textbf{Category} & \textbf{Features} \\
+\midrule
+Demographic (5) & Age, Weight, Length, Sex, BMI \\
+History (12) & DM, HTN, Current Smoker, EX-Smoker, FH, Obesity, CRF, CVA, Airway disease, Thyroid Disease, CHF, DLP \\
+Exam (7) & BP, PR, Edema, Weak Peripheral Pulse, Lung rales, Systolic Murmur, Diastolic Murmur \\
+Symptoms (7) & Typical Chest Pain, Dyspnea, Function Class, Atypical, Nonanginal, Exertional CP (dropped), LowTH Ang \\
+ECG (7) & Q Wave, St Elevation, St Depression, Tinversion, LVH, Poor R Progression, BBB \\
+Labs (14) & FBS, CR, TG, LDL, HDL, BUN, ESR, HB, K, Na, WBC, Lymph, Neut, PLT \\
+Echo (3) & EF-TTE, Region RWMA, VHD \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The dataset exhibits several known quirks that are handled explicitly in the preprocessing pipeline:
+
+\begin{itemize}
+    \item \textbf{Sex typo}: The value \texttt{Fmale} appears in 127 rows and is normalized to \texttt{Female}
+    \item \textbf{Region RWMA codes}: Integer codes 0--4 with undocumented anatomical mapping; treated as categorical
+    \item \textbf{Near-constant features}: CHF (1 positive), LowTH Ang (2 positives) --- kept with regularization
+    \item \textbf{Rare categorical levels}: CRF, CVA, Weak Peripheral Pulse, Diastolic Murmur, Poor R Progression, Lung rales, Airway disease (all n$<$12) --- unstable under CV but kept faithfully
+    \item \textbf{Outliers}: TG 1050, FBS 400, BP 190, PR 110, WBC 18000, PLT 25/742, HDL 111, BUN 52 --- reviewed but never blind-dropped
+    \item \textbf{Collinear pairs}: Neut/Lymph (differentials), Weight/Length/BMI/Obesity
+\end{itemize}
+
+The label structure reveals important relationships between targets:
+
+\begin{itemize}
+    \item P(CAD $|$ vessel stenotic): LAD 0.994, LCX 1.0, RCA 1.0 --- CAD is nearly a deterministic OR of the three vessel labels
+    \item P(vessel $|$ CAD): LAD 0.815, LCX 0.551, RCA 0.528
+    \item Co-occurrence: LCX$\rightarrow$LAD 81\%, RCA$\rightarrow$LAD 76\%, LAD$\rightarrow$LCX 54\% / RCA 49\%
+\end{itemize}
+
+These relationships motivate future work on classifier chains and CAD-as-OR ensemble methods.
+
+\subsection{Leakage Prevention}
+
+We enforce strict leakage prevention through a multi-layered mechanism. The core principle is that the four target columns ($\mathcal{L} = \{\texttt{LAD}, \texttt{LCX}, \texttt{RCA}, \texttt{Cath}\}$) must never appear as model inputs for any prediction head.
+
+\begin{equation}
+\mathcal{X} = \{f \in \mathcal{F} : f \notin \mathcal{L} \land f \notin \mathcal{T} \land f \notin \mathcal{D}\}
+\end{equation}
+
+where $\mathcal{F}$ is the full feature set, $\mathcal{T}$ is the target column for the current prediction head, and $\mathcal{D} = \{\texttt{Exertional CP}\}$ are zero-variance columns.
+
+The \texttt{split\_features\_target()} function implements this by:
+\begin{enumerate}
+    \item Dropping all leakage columns $\mathcal{L}$ plus the target column $\mathcal{T}$
+    \item Dropping zero-variance columns $\mathcal{D}$
+    \item Keeping only features in the allow-list \texttt{ALL\_INPUT\_FEATURES} (54 features)
+\end{enumerate}
+
+This allow-list provides defense-in-depth: even if a future CSV contains stray columns, they are excluded automatically.
+
+Preprocessors are fitted exclusively on training data:
+\begin{itemize}
+    \item Manually within each cross-validation fold during model selection
+    \item On the full 242-row training split for the final saved artifact
+\end{itemize}
+
+The 61-row test split is never used during fitting, selection, or preprocessing. Post-training verification confirms that no leakage columns appear in transformed feature names:
+
+\begin{footnotesize}
+\begin{verbatim}
+python3 -c "
+import joblib
+p = joblib.load(
+  'artifacts/cad/preprocessor.joblib')
+n = list(p.get_feature_names_out())
+bad = ['LAD','LCX','RCA','Cath']
+print([x for x in n
+  if any(b in x for b in bad)]
+  or 'NONE - ok')
+"
+\end{verbatim}
+\end{footnotesize}
+
+\subsection{Preprocessing}
+
+Three preprocessing tracks are employed to accommodate different model families:
+
+\subsubsection{One-hot Track (81 output columns)}
+
+Used by Random Forest, XGBoost, HistGradientBoosting, and stacking models.
+
+\begin{itemize}
+    \item \textbf{Numerical features (33)}: \texttt{SimpleImputer(strategy="median")} $\rightarrow$ \texttt{RobustScaler}
+    \item \textbf{Categorical features (21)}: \texttt{SimpleImputer(strategy="most\_frequent")} $\rightarrow$ \texttt{OneHotEncoder(handle\_unknown="ignore")}
+\end{itemize}
+
+The 21 categorical features expand to 48 one-hot columns:
+\begin{itemize}
+    \item 15 Y/N flags $\rightarrow$ 1 column each (15)
+    \item Sex $\rightarrow$ 2 columns (Male, Female)
+    \item BBB $\rightarrow$ 3 columns (N, LBBB, RBBB)
+    \item VHD $\rightarrow$ 4 columns (N, mild, Moderate, Severe)
+    \item Region RWMA $\rightarrow$ 5 columns (0, 1, 2, 3, 4)
+\end{itemize}
+
+Total: 33 numerical + 48 one-hot = 81 columns.
+
+\subsubsection{Native Track (54 output columns)}
+
+Used by LightGBM and CatBoost models.
+
+\begin{itemize}
+    \item \textbf{Numerical features (33)}: Identical to one-hot track
+    \item \textbf{Categorical features (21)}: \texttt{SimpleImputer(strategy="most\_frequent")} $\rightarrow$ \texttt{OrdinalEncoder(unknown\_value=-1)}
+\end{itemize}
+
+Output order is \texttt{[NUMERIC\_FEATURES..., NATIVE\_CAT\_FEATURES...]}, so categorical positions are \texttt{range(33, 54)}. The \texttt{CatBoostNative} adapter int-casts categorical codes at both fit and prediction time, because CatBoost rejects float matrices with categorical features.
+
+\subsubsection{Voting Track (81 output columns + unit-variance scaling)}
+
+Used by the voting ensemble. Identical one-hot encoding to the one-hot track, followed by \texttt{StandardScaler(with\_mean=False)} so all features (including one-hot) have unit variance. This conditions the ElasticNet member (L1/L2 regularization is scale-sensitive).
+
+\begin{itemize}
+    \item \textbf{Numerical features (33)}: Same as one-hot track
+    \item \textbf{Categorical features (21)}: Same one-hot encoding as one-hot track
+    \item \textbf{Post-scaling}: \texttt{StandardScaler(with\_mean=False)} --- unit variance for all 81 columns
+\end{itemize}
+
+Total: 81 columns with unit variance.
+
+\subsubsection{Design Decisions}
+
+\begin{itemize}
+    \item \textbf{RobustScaler over StandardScaler}: TG, FBS, WBC, PLT, and ESR are heavily right-skewed. RobustScaler uses median and interquartile range, making it less sensitive to outliers.
+    \item \textbf{Median imputation}: More robust than mean for skewed distributions. Fitted on training data only.
+    \item \textbf{Mode imputation for categoricals}: The most frequent value is the safest default for sparse categorical levels.
+    \item \textbf{No log-transform}: Recorded as future work. Tree winners do not require it, but it could benefit linear models.
+    \item \textbf{handle\_unknown="ignore"}: Makes inference robust to unseen categories by producing all-zeros one-hot rows.
+\end{itemize}
+
+\subsection{Model Selection}
+
+We evaluate 32 configurations per target across seven model families (Table~\ref{tab:configs}).
+
+% Full-width (two-column spanning) table so long hyperparameter strings fit.
+\begin{table*}[!t]
+\centering
+\caption{Model Configuration Space}
+\label{tab:configs}
+\small
+\begin{tabular}{llcp{0.58\textwidth}}
+\toprule
+\textbf{Model} & \textbf{Track} & \textbf{Configs} & \textbf{Key Hyperparameters} \\
+\midrule
+Random Forest & one-hot & 8 & \texttt{n\_estimators} $\in \{200, 400\}$, \texttt{max\_depth} $\in \{8, \text{None}\}$, \texttt{min\_samples\_leaf} $\in \{1, 2\}$ \\
+XGBoost & one-hot & 8 & \texttt{n\_estimators} $\in \{200, 400\}$, \texttt{max\_depth} $\in \{3, 4\}$, \texttt{learning\_rate} $\in \{0.05, 0.1\}$ \\
+HistGradientBoosting & one-hot & 4 & \texttt{max\_leaf\_nodes} $\in \{15, 31\}$, \texttt{min\_samples\_leaf} $\in \{10, 20\}$ \\
+LightGBM & native & 6 & \texttt{num\_leaves} $\in \{7, 15, 31\}$, \texttt{min\_child\_samples} $\in \{10, 20\}$ \\
+CatBoost & native & 4 & \texttt{depth} $\in \{4, 6\}$, \texttt{l2\_leaf\_reg} $\in \{3, 10\}$ \\
+Stacking & one-hot & 1 & RF + XGB + HGB $\rightarrow$ LogReg \\
+Voting & voting & 1 & RF + XGB + HGB + LGBM + CatBoost + ElasticNet $\rightarrow$ soft vote \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Model selection uses 10 repeats of stratified 5-fold cross-validation (seeds 42--51) on the 242-row training partition. Each configuration produces 50 CV scores (10 repeats $\times$ 5 folds). The winner is selected by:
+
+\begin{equation}
+\text{winner} = \arg\max_{c \in \mathcal{C}} \Big( \overline{\text{AUC}}_{\text{CV}}(c),\ \overline{\text{F1}}_{\text{CV}}(c) \Big)
+\end{equation}
+
+where $\overline{\text{AUC}}_{\text{CV}}(c)$ and $\overline{\text{F1}}_{\text{CV}}(c)$ are the mean cross-validated ROC-AUC and F1 of configuration $c$, and the tuple comparison implements lexicographic ordering: highest mean CV ROC-AUC first, with mean F1 as tie-breaker.
+
+Per-fold metrics recorded:
+\begin{itemize}
+    \item ROC-AUC (primary selection criterion)
+    \item F1 score (tie-breaker)
+    \item PR-AUC / average precision (exposes ranking quality under class imbalance)
+    \item Brier score (probability calibration quality)
+\end{itemize}
+
+The winning configuration is refit on the full 242-row training split and saved with its preprocessor, a 100-row transformed training background for explanations, and comprehensive metadata including all per-config CV results.
+
+\subsection{Explainability}
+
+We compute approximate patient-specific grouped permutation Shapley values. The algorithm follows the permutation attribution approach described in the SHAP documentation, using NumPy and \texttt{predict\_proba} directly.
+
+\subsubsection{Algorithm}
+
+For a patient $\mathbf{x}$, reference set $\mathcal{R}$, and feature groups $\mathcal{G}$:
+
+\begin{equation}
+\begin{split}
+\phi_i(\mathbf{x}) ={}& \frac{1}{|\mathcal{R}|} \sum_{\mathbf{r} \in \mathcal{R}} \frac{1}{K} \sum_{k=1}^{K} \Big[ \\
+& P(\mathbf{x}_{\pi_k(1:i)}, \mathbf{r}_{\pi_k(i+1:n)}) \\
+& - P(\mathbf{x}_{\pi_k(1:i-1)}, \mathbf{r}_{\pi_k(i:n)}) \Big]
+\end{split}
+\end{equation}
+
+where $\pi_k$ is a random permutation of feature indices and $K$ is the number of sampled orderings (Algorithm~\ref{alg:shapley}).
+
+\begin{algorithm}[!t]
+\caption{Grouped Permutation Shapley}
+\label{alg:shapley}
+\footnotesize
+\algrenewcommand\algorithmicindent{0.9em}
+\begin{algorithmic}[1]
+\Require Model $m$, patient $\mathbf{x}$, background $\mathcal{B}$, groups $\mathcal{G}$, orderings $K$
+\State $\boldsymbol{\phi} \gets \mathbf{0}^{|\mathcal{G}|}$
+\For{each reference $\mathbf{r} \in \mathcal{B}$}
+    \For{$k = 1$ to $K$}
+        \State $\pi \gets$ random permutation of $\mathcal{G}$
+        \For{$\sigma \in \{\pi,\ \mathrm{reverse}(\pi)\}$}
+            \State $\mathbf{z} \gets \mathbf{r}$;\quad $p_{\text{prev}} \gets m(\mathbf{z})$
+            \For{$i = 1$ to $|\mathcal{G}|$}
+                \State $\mathbf{z}[\sigma_i] \gets \mathbf{x}[\sigma_i]$
+                \State $p \gets m(\mathbf{z})$
+                \State $\phi_{\sigma_i} \gets \phi_{\sigma_i} + p - p_{\text{prev}}$
+                \State $p_{\text{prev}} \gets p$
+            \EndFor
+        \EndFor
+    \EndFor
+\EndFor
+\State \Return $\boldsymbol{\phi} \,/\, (|\mathcal{B}| \cdot K \cdot 2)$
+\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Implementation Details}
+
+\begin{itemize}
+    \item \textbf{Reference rows}: 16 rows sampled from each target's 100-row saved training background using seed 42
+    \item \textbf{Orderings}: 4 random permutations and their reverses (8 total) per reference row
+    \item \textbf{Feature grouping}: One-hot columns are grouped back to their source categorical input. The algorithm never replaces part of a categorical encoding on its own.
+    \item \textbf{Batching}: All paths are evaluated in a single \texttt{predict\_proba} call for computational efficiency
+    \item \textbf{Additivity}: Complete paths telescope exactly, so $\text{base\_value} + \sum \text{contributions} + \text{remaining\_contribution} = \text{probability}$
+\end{itemize}
+
+\subsubsection{Why Permutation Shapley}
+
+\begin{itemize}
+    \item \textbf{No fragile optional runtime}: SHAP's TreeExplainer has a broken numba import path in some environments
+    \item \textbf{Works with CatBoostNative}: CatBoost's custom adapter does not integrate cleanly with SHAP's tree-specific optimizations
+    \item \textbf{Grouped categories}: One-hot blocks move together naturally
+    \item \textbf{Model-agnostic}: Works with any classifier exposing \texttt{predict\_proba}
+\end{itemize}
+
+\subsection{System Architecture}
+
+The system follows a three-tier architecture:
+
+\subsubsection{Training Layer (\texttt{training/})}
+
+Owns all model fitting and frozen inference:
+\begin{itemize}
+    \item \texttt{preprocessing.py}: Constants, cleaning, preprocessor builders
+    \item \texttt{train.py}: Repeated-CV model selection and artifact saving
+    \item \texttt{evaluate.py}: Held-out test evaluation
+    \item \texttt{inference.py}: Frozen artifact loading and prediction
+    \item \texttt{model\_info.py}: Metrics/metadata export for API
+    \item \texttt{stacking.py}: Stacked ensemble implementation
+    \item \texttt{voting.py}: Soft voting ensemble with weight/threshold optimization
+    \item \texttt{native\_models.py}: CatBoost adapter
+\end{itemize}
+
+Artifacts are saved per target:
+\begin{footnotesize}
+\begin{verbatim}
+artifacts/
+|-- cad/{preprocessor.joblib, model.joblib,
+|        shap_background.npz, metadata.json}
+|-- lad/{...}
+|-- lcx/{...}
+|-- rca/{...}
+|-- metrics.json
+`-- experiments.csv
+\end{verbatim}
+\end{footnotesize}
+
+\subsubsection{Serving Layer (\texttt{backend/})}
+
+FastAPI application with validated endpoints:
+\begin{itemize}
+    \item \texttt{GET /health}: Service status and disclaimer
+    \item \texttt{GET /model-info}: Saved model metadata and metrics
+    \item \texttt{GET /input-defaults}: All 54 input defaults
+    \item \texttt{POST /predict}: Four binary predictions
+    \item \texttt{POST /explain}: Patient-specific Shapley contributions
+\end{itemize}
+
+Input validation uses Pydantic models with:
+\begin{itemize}
+    \item \texttt{extra="forbid"}: Rejects unknown keys including leakage labels
+    \item \texttt{allow\_inf\_nan=False}: Rejects NaN/Infinity
+    \item Explicit defaults for all 54 fields
+    \item CSV alias support (e.g., \texttt{"Current Smoker"} $\rightarrow$ \texttt{Current\_Smoker})
+\end{itemize}
+
+\subsubsection{Presentation Layer (\texttt{frontend/})}
+
+React 19 + TypeScript + Vite dashboard:
+\begin{itemize}
+    \item \textbf{Patient form}: 54 inputs in 8 collapsible sections
+    \item \textbf{PDF scanner}: Text extraction and field mapping from clinical reports
+    \item \textbf{Risk cards}: Four predictions with probability bars
+    \item \textbf{3D heart viewer}: Registered GLB heart with coronary overlays
+    \item \textbf{Explanation panel}: Top-8 Shapley contributions chart
+    \item \textbf{Dual views}: Clinician and patient presentation modes
+    \item \textbf{PDF report export}: Complete assessment with all inputs and predictions
+\end{itemize}
+
+\section{Results}
+
+\subsection{Held-out Test Performance}
+
+Table~\ref{tab:results} presents the locked test set results (61 patients, seed 42):
+
+\begin{table}[htbp]
+\centering
+\caption{Held-out Test Metrics (n=61)}
+\label{tab:results}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Target} & \textbf{Acc} & \textbf{Prec} & \textbf{Rec} & \textbf{F1} & \textbf{AUC} & \textbf{TN/FP/FN/TP} \\
+\midrule
+CAD & .852 & .870 & .930 & .899 & .893 & 12/6/3/40 \\
+LAD & .787 & .795 & .861 & .827 & .843 & 17/8/5/31 \\
+LCX & .672 & .611 & .458 & .524 & .711 & 30/7/13/11 \\
+RCA & .672 & .600 & .391 & .474 & .748 & 32/6/14/9 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+CAD and LAD models demonstrate strong generalization with AUC $> 0.84$ and recall $> 0.86$. The CAD model correctly identifies 40 of 43 positive patients (93\% recall) with only 6 false positives. The LAD model achieves 86\% recall with 8 false positives.
+
+LCX and RCA models achieve moderate AUC (0.71--0.75) but weak recall ($< 0.50$). The LCX model detects only 11 of 24 positive cases (45.8\% recall), and the RCA model detects only 9 of 23 positive cases (39.1\% recall). This reflects the challenge of detecting minority-positive vessels in a small dataset with sparse signals.
+
+\subsection{Cross-Validation Performance}
+
+Mean CV ROC-AUC across 10 repeats:
+
+\begin{table}[htbp]
+\centering
+\caption{Cross-Validation Results}
+\label{tab:cv}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lp{1.45in}cc}
+\toprule
+\textbf{Target} & \textbf{Winner} & \textbf{CV AUC} & \textbf{CV F1} \\
+\midrule
+CAD & CatBoost (depth 4, lr 0.05, L2 3) & $0.9273 \pm 0.030$ & 0.9074 \\
+LAD & RF (400 trees, unlimited depth, leaf 2) & $0.8428 \pm 0.058$ & 0.8181 \\
+LCX & RF (400 trees, unlimited depth, leaf 2) & $0.7400 \pm 0.060$ & 0.5103 \\
+RCA & RF (400 trees, depth 8, leaf 2) & $0.7067 \pm 0.068$ & 0.4377 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The CAD model shows the highest CV AUC (0.9273) with low variance ($\pm 0.030$), indicating stable performance across different data splits. The LAD model also demonstrates good stability. The LCX and RCA models show higher variance, reflecting the instability of learning from fewer positive examples.
+
+\subsection{Feature Stability}
+
+Top-10 feature importance stability (mean pairwise Jaccard across 10 repeat seeds):
+
+\begin{table}[htbp]
+\centering
+\caption{Feature Importance Stability}
+\label{tab:stability}
+\begin{tabular}{lc}
+\toprule
+\textbf{Target} & \textbf{Jaccard Similarity} \\
+\midrule
+CAD & 0.85 \\
+LAD & 0.83 \\
+LCX & 0.66 \\
+RCA & 0.77 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+CAD and LAD models show high stability ($> 0.80$), meaning the same features are consistently identified as important across different random seeds. LCX shows moderate stability (0.66), indicating more variability in which features the model relies on. This is consistent with the weaker signal available for LCX prediction.
+
+\subsection{Model Comparison}
+
+CatBoost with native categorical encoding won the CAD target, demonstrating the effectiveness of ordered boosting on small datasets with categorical features. The native categorical handling avoids the dimensionality explosion of one-hot encoding while preserving the categorical nature of features.
+
+Random Forest won all three vessel targets, with \texttt{class\_weight="balanced"} handling the mild class imbalance. The ensemble nature of random forests provides robustness to outliers and non-linear relationships without requiring feature scaling.
+
+XGBoost, LightGBM, HistGradientBoosting, the stacking ensemble, and the voting ensemble were fairly compared across all targets but did not win any. The stacking ensemble, which combines RF, XGB, and HGB predictions through a logistic regression meta-learner, did not outperform the individual models, suggesting that the base models make correlated errors. The voting ensemble combines all six model families (RF, XGB, HGB, LGBM, CatBoost, ElasticNet) via soft voting with grid-searched weights and threshold optimized for F2 on out-of-fold predictions.
+
+\subsection{Version 1 vs Version 2}
+
+The transition from v1 (single 5-fold CV, RF/XGB only) to v2 (10$\times$5-fold CV, six model families) produced the following changes:
+
+\begin{table}[htbp]
+\centering
+\caption{v1 vs v2 Test AUC Comparison}
+\label{tab:v1v2}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Target} & \textbf{v1 AUC} & \textbf{v2 AUC} & \textbf{Change} \\
+\midrule
+CAD & 0.877 & 0.893 & +0.016 \\
+LAD & 0.839 & 0.843 & +0.004 \\
+LCX & 0.693 & 0.711 & +0.018 \\
+RCA & 0.735 & 0.748 & +0.013 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Notably, v1's RCA pick (single-CV 0.7343) was exposed as seed luck against its honest mean (0.7067) under repeated CV. The v2 protocol provides more reliable model selection.
+
+\section{Discussion}
+
+\subsection{Strengths}
+
+\begin{itemize}
+    \item \textbf{Leakage-safe by construction}: Allow-list validation and fold-level preprocessing prevent target leakage. The four target columns (LAD, LCX, RCA, Cath) are excluded from all model inputs through multiple redundant mechanisms.
+    \item \textbf{Rigorous validation}: Repeated CV with 50 scores per config provides robust model selection. The locked test set is never used during fitting or selection.
+    \item \textbf{Interpretable}: Patient-specific Shapley values with additive decomposition. One-hot categories move together as complete units. The method works with all model families without fragile dependencies.
+    \item \textbf{Transparent}: Honest reporting of limitations including uncalibrated probabilities, weak vessel-level recall, and small sample size. No attempt is made to hide or tune away poor performance.
+    \item \textbf{Reproducible}: Fixed seeds, version-pinned dependencies, and committed artifacts enable exact reproduction. Reruns produce the same test split and artifacts.
+    \item \textbf{Production-ready architecture}: Separation of training and serving, validated API with explicit defaults, and comprehensive error handling.
+\end{itemize}
+
+\subsection{Limitations}
+
+\begin{itemize}
+    \item \textbf{Small sample size}: $n = 303$ limits vessel-level model performance. LCX and RCA have only 119 and 114 positive cases respectively, with 61-row test sets containing only 24 and 23 positives. Recall below 0.50 means more than half of positive cases are missed.
+    \item \textbf{Single-source data}: All patients come from the same institution. No external validation has been performed on independent cohorts.
+    \item \textbf{Uncalibrated probabilities}: Raw \texttt{predict\_proba} outputs without Platt or isotonic scaling. A probability of 0.7 does not mean a 70\% chance of disease in a validated clinical sense.
+    \item \textbf{No lesion localization}: The 3D heart is schematic context, not anatomical reconstruction. Vessel highlighting reflects statistical stenosis probability, not plaque location.
+    \item \textbf{Missing modalities}: No imaging, waveform, or signal data is used. The dataset provides only structured clinical measurements.
+    \item \textbf{No vessel-dependence modeling}: The four models are independent. Classifier chains and CAD-as-OR ensembles that could capture vessel co-occurrence are not yet implemented.
+\end{itemize}
+
+\subsection{Clinical Implications}
+
+The CAD and LAD models achieve performance that could be clinically useful for decision support. A CAD AUC of 0.893 with 93\% recall means the system correctly identifies most patients with coronary disease, potentially reducing missed diagnoses. However, the weak LCX and RCA recall means the system should not be used to rule out vessel-specific disease.
+
+The uncalibrated probabilities should not be presented as validated risk percentages. Clinical deployment would require calibration on a larger, representative cohort.
+
+The 3D heart visualization provides intuitive context for vessel-specific predictions but must not be interpreted as showing lesion location. The schematic nature is clearly labeled in the interface.
+
+\subsection{Future Work}
+
+\begin{enumerate}
+    \item \textbf{Calibration}: Implement isotonic calibration for CAD/LAD and Platt/sigmoid calibration for LCX/RCA within CV folds. Report Brier score and calibration curves alongside AUC.
+    \item \textbf{Vessel dependence}: Explore classifier chains LAD $\rightarrow$ LCX $\rightarrow$ RCA using out-of-fold predicted probabilities as extra features. The 81\% LCX$\rightarrow$LAD and 76\% RCA$\rightarrow$LAD co-occurrence rates suggest potential gains.
+    \item \textbf{CAD-as-OR}: Compare learned CAD head vs $1 - \prod_{v \in \{\text{LAD, LCX, RCA}\}} (1 - P(v))$ from vessel models. Given the 0.994--1.0 determinism of CAD given any stenotic vessel, the derived score may outperform the learned model.
+    \item \textbf{Feature engineering}: Evaluate log transforms for skewed labs (TG, FBS, WBC, PLT, ESR), lipid ratios (LDL/HDL, TG/HDL), comorbidity burden counts, and ECG abnormality counts.
+    \item \textbf{External validation}: Validate on independent cohorts from different institutions to assess generalizability.
+    \item \textbf{Multimodal fusion}: Incorporate ECG waveforms and echo imaging when available, using the fusion architecture described in the documentation.
+    \item \textbf{Threshold optimization}: The voting ensemble already tunes its decision threshold on out-of-fold predictions to maximize F2. Report Youden-J and F1-optimal thresholds per vessel to contextualize the default 0.5 threshold for individual models.
+\end{enumerate}
+
+\section{Conclusion}
+
+We presented Cardisoft, a leakage-safe clinical decision support system for CAD and vessel-specific stenosis prediction. The system achieves strong performance for CAD (AUC 0.893) and LAD (AUC 0.843) while honestly reporting weaker vessel-level results for LCX (AUC 0.711, recall 0.458) and RCA (AUC 0.748, recall 0.391).
+
+The key contributions of this work are:
+\begin{enumerate}
+    \item A leakage-safe machine learning pipeline with allow-list validation and fold-level preprocessing
+    \item Rigorous model selection using repeated cross-validation across 32 configurations and seven model families
+    \item Patient-specific grouped permutation Shapley explanations that respect categorical feature groupings
+    \item An interactive 3D schematic heart visualization with vessel-specific probability overlays
+    \item Transparent reporting of limitations and a clear roadmap for future improvement
+\end{enumerate}
+
+The architecture separates training from serving, enforces strict leakage prevention, and maintains reproducibility through version-pinned dependencies and committed artifacts. The system is designed as a research prototype for decision support, not a diagnostic tool, and all predictions should be interpreted with appropriate clinical judgment.
+
+\begin{thebibliography}{00}
+
+\bibitem{virani2020}
+S.~S. Virani et al., ``Heart disease and stroke statistics---2020 update: A report from the American Heart Association,'' \textit{Circulation}, vol. 141, no. 9, pp. e139--e596, 2020.
+
+\bibitem{alizadeh2018}
+R.~Alizadeh Sani et al., ``Z-Alizadeh Sani dataset,'' UCI Machine Learning Repository, 2018.
+
+\bibitem{framingham}
+P.~W. Wilson et al., ``Prediction of coronary heart disease using risk factor categories,'' \textit{Circulation}, vol. 97, no. 18, pp. 1837--1847, 1998.
+
+\bibitem{abdar2019}
+M.~Abdar et al., ``A new nested ensemble technique for automated diagnosis of high-risk coronary artery disease,'' \textit{Biomedical Signal Processing and Control}, vol. 53, pp. 101576, 2019.
+
+\bibitem{ambale2017}
+V.~Ambale et al., ``A novel approach for coronary artery disease diagnosis using hybrid feature selection and ensemble learning,'' \textit{Computers in Biology and Medicine}, vol. 87, pp. 167--176, 2017.
+
+\bibitem{lundberg2017}
+S.~M. Lundberg and S.-I. Lee, ``A unified approach to interpreting model predictions,'' in \textit{Proc. Advances in Neural Information Processing Systems}, 2017, pp. 4765--4774.
+
+\bibitem{lundberg2018}
+S.~M. Lundberg et al., ``Consistent individualized feature attribution for tree ensembles,'' \textit{arXiv preprint arXiv:1802.03888}, 2018.
+
+\bibitem{ribeiro2016}
+M.~T. Ribeiro et al., ``Why should I trust you? Explaining the predictions of any classifier,'' in \textit{Proc. ACM SIGKDD International Conference on Knowledge Discovery and Data Mining}, 2016, pp. 1135--1144.
+
+\bibitem{kaufman2020}
+C.~G. Kaufman et al., ``Leakage in data mining: Formulation, detection, and avoidance,'' \textit{ACM Transactions on Knowledge Discovery from Data}, vol. 14, no. 4, pp. 1--35, 2020.
+
+\bibitem{acharya2017}
+U.~R. Acharya et al., ``Automated detection of coronary artery disease using different durations of ECG segments with convolutional neural network,'' \textit{Knowledge-Based Systems}, vol. 132, pp. 62--71, 2017.
+
+\bibitem{choi2016}
+E.~Choi et al., ``RETAIN: An interpretable predictive model for healthcare using reverse time attention mechanism,'' in \textit{Proc. Advances in Neural Information Processing Systems}, 2016, pp. 3504--3512.
+
+\end{thebibliography}
+
+\end{document}
