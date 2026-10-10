@@ -301,16 +301,23 @@ export default function App() {
       }
     : {};
 
+  
   const expl = explanations[target];
+
   const chartData = expl
     ? [...expl.features]
         .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
         .slice(0, 8)
-        .map((f) => ({ ...f, label: f.assumed ? `${f.name} (default)` : f.name }))
+        .map((f) => ({
+          ...f,
+          label: f.assumed ? `${f.name} (auto-supplied)` : f.name,
+        }))
     : [];
-  const selected = predOf(target);
-  const axis = dark ? "#93a7bd" : "#7b8da1";
 
+  const selected = predOf(target);
+
+
+  const axis = dark ? "#93a7bd" : "#7b8da1";
   return (
     <div className="page">
       <header className="top">
@@ -741,7 +748,7 @@ export default function App() {
                       <thead>
                         <tr>
                           <th>Measurement</th>
-                          <th>Patient value</th>
+                          <th>Value used</th>
                           <th>Model contribution</th>
                         </tr>
                       </thead>
@@ -763,7 +770,16 @@ export default function App() {
                           return (
                             <tr key={f.key}>
                               <td>{f.label}</td>
-                              <td>{shown}</td>
+                              <td>
+  {shown}
+  {expl?.features.some(
+    (x) => x.name === f.key && x.assumed
+  ) && (
+    <span title="This feature was supplied automatically rather than collected through the form">
+      {" "}(auto-supplied)
+    </span>
+  )}
+</td>
                               <td className={cls}>{label}</td>
                             </tr>
                           );
