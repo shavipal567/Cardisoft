@@ -15,3 +15,5 @@ errors): [API](../api.md). Explainability design:
 ::: backend.routes.predict
 
 ::: backend.routes.explain
+
+::: backend.routes.model_info

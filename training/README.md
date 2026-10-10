@@ -70,8 +70,7 @@ then keeps only known `ALL_INPUT_FEATURES`. Consequences:
   sees `LAD` (nor LCX/RCA/Cath), etc.
 - New stray columns in a future CSV are excluded by the allow-list, not just
   the drop-list.
-- Preprocessors are fitted on **train data only**: inside each CV fold through
-  `sklearn.pipeline.Pipeline` (`prep` → `clf`), and on the 242-row train split
+- Preprocessors are fitted on **train data only**: manually inside each outer CV fold, and on the 242-row train split
   for the final refit. The 61-row test split is never touched until
   `evaluate.py`.
 
@@ -172,7 +171,7 @@ Each `artifacts/<target>/` holds:
   or native track, see `metadata.json` → `best.prep`).
 - `model.joblib` — fitted classifier (`RandomForest`/`XGB`/`HGB`/`LGBM`/
   `CatBoostNative`/`StackedModel` — all expose `predict_proba`).
-- `shap_background.npz` — 100 transformed train rows (seeded) for TreeSHAP.
+- `shap_background.npz` — 100 transformed train rows (seeded) for probability-space permutation explanations.
 - `metadata.json` — target/column/positive label, train/test sizes and pos
   rates, winning config, **all per-config CV summaries**, winner stability
   Jaccard, repeats/seeds, git hash.
@@ -192,7 +191,7 @@ artifacts — the test rows were never used for fitting or selection. Writes
 | rca | 0.672 | 0.600 | 0.391 | 0.474 | 0.748 | 32/6/14/9 |
 
 v1 → v2 test AUC: CAD 0.877→0.893, LAD 0.839→0.843, LCX 0.693→0.711,
-RCA 0.735→0.748. LCX recall nearly doubled (0.333→0.458).
+RCA 0.735→0.748. LCX recall increased from 0.333 to 0.458.
 
 Reading: CAD and LAD generalize well; LCX/RCA still detect a minority of
 positives — expected on 303 rows with ~38% prevalence and sparse
@@ -223,14 +222,15 @@ artifacts. Per-config logs go to stdout; run logs are kept in
   keys become `None` → imputed by the frozen preprocessor. Returns the
   PROBLEM.md §23 schema: `{cad: {prediction, probability}, vessels: {LAD, LCX,
   RCA}}`, threshold 0.5.
-- `transformed_row(features, target="cad")` — returns `(vector_81,
-  feature_names_81)` for the explainer.
+- `transformed_row(features, target="cad")` — returns the transformed vector
+  and names: 54 native columns for CAD, 81 one-hot columns for the vessel winners.
 - `available()` — `True` iff all four artifact dirs load.
 - `artifacts_dir()` — `ARTIFACTS_DIR` env var, default `training/artifacts/`.
 
 `backend/services/predictor.py` is a thin re-export of this module, so there is
 exactly one implementation of cleaning, transformation, and thresholding —
-train-serve skew is structurally impossible.
+transformation drift is reduced. API schema defaults remain distinct from
+fitted imputation; validate through `PatientInput` when reproducing HTTP inputs.
 
 ## 9. Limitations & next steps
 
@@ -243,6 +243,23 @@ train-serve skew is structurally impossible.
   uses 10×5-fold CV means, but a larger cohort is the real fix.
 - Probabilities are uncalibrated model votes — do not present them as
   validated risk percentages (calibration backlogged).
-- `shap_background.npz` ships for TreeSHAP but the pinned `shap` install can
-  break against `numba`/`coverage` versions (observed); backend falls back to
-  labeled gain importance (see `backend/README.md`).
+- Explanations now use approximate grouped permutation Shapley contributions
+  computed with NumPy and each saved model's `predict_proba`. No SHAP/numba
+  dependency or global-importance fallback is used (see `docs/explainability.md`).
+- The optional stacking candidate preprocesses at the outer-fold level before
+  inner OOF predictions. Inner-fold preprocessing isolation remains work; this
+  candidate did not win any saved target.
+
+## 10. Dashboard metadata
+
+The backend serves `/model-info` using `training/model_info.py`, reading saved
+metrics and per-target metadata from `ARTIFACTS_DIR`. Refresh the offline demo
+snapshot after evaluating new artifacts:
+
+```bash
+python training/model_info.py --output frontend/public/model-info.json
+```
+
+The frontend defaults to live prediction. Static prediction/explanation fixtures
+are used only in explicitly labelled demo mode. Regression checks live in
+`backend/tests/` and run with `python -m unittest discover -s backend/tests -v`.

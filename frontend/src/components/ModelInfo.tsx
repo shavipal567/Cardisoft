@@ -1,13 +1,7 @@
 import { useEffect, useState } from "react";
 
-type Row = { positive_rate: number; accuracy: number; precision: number; recall: number; f1: number; roc_auc: number };
-interface Metrics {
-  model_name: string;
-  status: string;
-  evaluation: string;
-  dataset: { patients: number; features: number; train: number; test: number };
-  targets: Record<string, Row>;
-}
+import { DEMO_MODE, getModelInfo } from "../api";
+import type { ModelMetrics } from "../api";
 
 const LIMITS = [
   "Small dataset: 303 patients from one source, with no external validation.",
@@ -19,12 +13,11 @@ const LIMITS = [
 ];
 
 export default function ModelInfo() {
-  const [m, setM] = useState<Metrics | null>(null);
+  const [m, setM] = useState<ModelMetrics | null>(null);
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    fetch("/mock_metrics.json")
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`Request failed (${r.status})`))))
+    getModelInfo()
       .then(setM)
       .catch((e) => setErr((e as Error).message));
   }, []);
@@ -38,6 +31,7 @@ export default function ModelInfo() {
     <div>
       <div className="card">
         <h2>About the model</h2>
+        {DEMO_MODE && <p className="note">Demo mode: saved evaluation snapshot. Predictions are illustrative fixtures.</p>}
         <p style={{ margin: "0 0 6px" }}>
           <b>{m.model_name}.</b> {m.status}
         </p>
@@ -55,6 +49,7 @@ export default function ModelInfo() {
             <thead>
               <tr>
                 <th>Target</th>
+                <th>Model</th>
                 <th>Accuracy</th>
                 <th>Always-guess baseline</th>
                 <th>Precision</th>
@@ -67,6 +62,7 @@ export default function ModelInfo() {
               {Object.entries(m.targets).map(([t, r]) => (
                 <tr key={t}>
                   <td><b>{t}</b></td>
+                  <td>{r.model_name}</td>
                   <td>{pc(r.accuracy)}</td>
                   <td>{pc(Math.max(r.positive_rate, 1 - r.positive_rate))}</td>
                   <td>{pc(r.precision)}</td>
@@ -86,7 +82,7 @@ export default function ModelInfo() {
 
       <div className="two-col">
         <div className="card">
-          <h3>Class balance (share of positive patients)</h3>
+          <h3>Test-set class balance (share of positive patients)</h3>
           {Object.entries(m.targets).map(([t, r]) => (
             <div key={t} style={{ marginBottom: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>

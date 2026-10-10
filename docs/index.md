@@ -5,7 +5,7 @@ system (Multimodal AI Hackathon 2026 — Track A).</p>
 <div class="cardisoft-badges">
 <span>303 patients</span>
 <span>4 prediction heads</span>
-<span>Best test AUC 0.877 (CAD)</span>
+<span>Test AUC 0.893 (CAD)</span>
 <span>Leakage-safe pipeline</span>
 </div>
 </div>
@@ -26,13 +26,13 @@ system (Multimodal AI Hackathon 2026 — Track A).</p>
 
 -   **Preprocessing**
 
-    How raw inputs are cleaned, imputed, and encoded (81 features).
+    How raw inputs are cleaned, imputed, and encoded (54 native / 81 one-hot features).
 
     [See the pipeline](preprocessing.md)
 
 -   **Feature Engineering**
 
-    What v1 ships, and what's on the backlog.
+    Current raw inputs and planned feature experiments.
 
     [Read the plan](feature-engineering.md)
 
@@ -44,7 +44,7 @@ system (Multimodal AI Hackathon 2026 — Track A).</p>
 
 -   **Models**
 
-    RF vs XGBoost comparison, winners, artifacts.
+    Six model families, repeated cross-validation, and saved winners.
 
     [Compare models](models.md)
 
@@ -56,13 +56,13 @@ system (Multimodal AI Hackathon 2026 — Track A).</p>
 
 -   **Explainability**
 
-    SHAP-first design, fallback method, causality wording.
+    Patient-specific permutation Shapley estimates and limitations.
 
     [Understand explanations](explainability.md)
 
 -   **Visualization**
 
-    3D/dashboard contract (specified, deferred — no frontend in scope).
+    Implemented React dashboard and interactive schematic heart.
 
     [See the contract](visualization.md)
 

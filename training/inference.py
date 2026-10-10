@@ -36,6 +36,11 @@ def _load_all():
     return bundle
 
 
+def get_artifact(target: str) -> dict:
+    """Return the cached frozen preprocessor/model for one prediction target."""
+    return _load_all()[target]
+
+
 def available() -> bool:
     try:
         _load_all()

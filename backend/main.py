@@ -1,11 +1,13 @@
 """Cardisoft backend: leakage-safe CAD + vessel prediction API."""
 
-from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from routes import explain as explain_route
 from routes import predict as predict_route
+from routes import model_info as model_info_route
 from services.predictor import available
 
 DISCLAIMER = (
@@ -18,6 +20,17 @@ DISCLAIMER = (
 )
 
 app = FastAPI(title="Cardisoft API", version="0.1.0")
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(_request, exc: RequestValidationError):
+    """Keep invalid NaN/Infinity inputs out of the JSON error response."""
+    return JSONResponse(status_code=422, content={
+        "detail": [{"loc": error["loc"], "msg": error["msg"], "type": error["type"]}
+                   for error in exc.errors()]
+    })
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,6 +39,7 @@ app.add_middleware(
 )
 app.include_router(predict_route.router, tags=["predict"])
 app.include_router(explain_route.router, tags=["explain"])
+app.include_router(model_info_route.router, tags=["model-info"])
 
 
 @app.get("/health")

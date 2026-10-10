@@ -1,0 +1,101 @@
+{
+  "model_name": "CAD: CatBoost; LAD: Random Forest; LCX: Random Forest; RCA: Random Forest",
+  "status": "Saved models; held-out test results. Probabilities are not calibrated.",
+  "evaluation": "Selection used 10 repeats of 5-fold cross-validation on 242 training patients. These metrics use the separate 61-patient test split (seed 42).",
+  "dataset": {
+    "patients": 303,
+    "features": 54,
+    "train": 242,
+    "test": 61
+  },
+  "targets": {
+    "CAD": {
+      "target": "cad",
+      "n_test": 61,
+      "pos_rate": 0.7049180327868853,
+      "accuracy": 0.8524590163934426,
+      "precision": 0.8695652173913043,
+      "recall": 0.9302325581395349,
+      "f1": 0.898876404494382,
+      "roc_auc": 0.8927648578811369,
+      "confusion_matrix": {
+        "tn": 12,
+        "fp": 6,
+        "fn": 3,
+        "tp": 40
+      },
+      "model_name": "CatBoost",
+      "positive_rate": 0.7049180327868853,
+      "cv_roc_auc": 0.9272527472527472,
+      "cv_roc_auc_std": 0.030092000124652952,
+      "repeats": 10,
+      "training_git_hash": "7e57a80"
+    },
+    "LAD": {
+      "target": "lad",
+      "n_test": 61,
+      "pos_rate": 0.5901639344262295,
+      "accuracy": 0.7868852459016393,
+      "precision": 0.7948717948717948,
+      "recall": 0.8611111111111112,
+      "f1": 0.8266666666666667,
+      "roc_auc": 0.8433333333333334,
+      "confusion_matrix": {
+        "tn": 17,
+        "fp": 8,
+        "fn": 5,
+        "tp": 31
+      },
+      "model_name": "Random Forest",
+      "positive_rate": 0.5901639344262295,
+      "cv_roc_auc": 0.842816678395496,
+      "cv_roc_auc_std": 0.058009876027055964,
+      "repeats": 10,
+      "training_git_hash": "7e57a80"
+    },
+    "LCX": {
+      "target": "lcx",
+      "n_test": 61,
+      "pos_rate": 0.39344262295081966,
+      "accuracy": 0.6721311475409836,
+      "precision": 0.6111111111111112,
+      "recall": 0.4583333333333333,
+      "f1": 0.5238095238095238,
+      "roc_auc": 0.7105855855855856,
+      "confusion_matrix": {
+        "tn": 30,
+        "fp": 7,
+        "fn": 13,
+        "tp": 11
+      },
+      "model_name": "Random Forest",
+      "positive_rate": 0.39344262295081966,
+      "cv_roc_auc": 0.7400060496067755,
+      "cv_roc_auc_std": 0.06012295862123018,
+      "repeats": 10,
+      "training_git_hash": "7e57a80"
+    },
+    "RCA": {
+      "target": "rca",
+      "n_test": 61,
+      "pos_rate": 0.3770491803278688,
+      "accuracy": 0.6721311475409836,
+      "precision": 0.6,
+      "recall": 0.391304347826087,
+      "f1": 0.47368421052631576,
+      "roc_auc": 0.7482837528604118,
+      "confusion_matrix": {
+        "tn": 32,
+        "fp": 6,
+        "fn": 14,
+        "tp": 9
+      },
+      "model_name": "Random Forest",
+      "positive_rate": 0.3770491803278688,
+      "cv_roc_auc": 0.7066548449977992,
+      "cv_roc_auc_std": 0.0675257056378401,
+      "repeats": 10,
+      "training_git_hash": "7e57a80"
+    }
+  }
+}

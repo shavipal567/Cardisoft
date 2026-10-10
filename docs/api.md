@@ -1,44 +1,35 @@
 # API
 
-Service: `backend/` (FastAPI). Stateless inference over frozen artifacts from
-`training/artifacts/`. Full reference in `backend/README.md`; this page is the
-short contract.
+FastAPI serves frozen saved models. See `backend/README.md` for run instructions
+and `backend/schemas.py` or `/openapi.json` for the complete validation schema.
 
-## Endpoints
-
-| Method + path | Purpose | Errors |
+| Method | Path | Purpose |
 |---|---|---|
-| `GET /health` | liveness, `artifacts_loaded`, targets, disclaimer (always 200) | — |
-| `POST /predict` | 4-head probabilities (`{cad, vessels{LAD,LCX,RCA}}`), threshold 0.5 | 503 no artifacts; 422 inference failure |
-| `POST /explain` | per-head attribution (`{target, base_value, probability, method, features[]}`) | 503 no artifacts; 422 bad target/explain failure |
+| GET | /health | Availability and disclaimer; always 200 |
+| GET | /model-info | Saved model names and held-out evaluation metadata |
+| POST | /predict | Four binary predictions and probabilities |
+| POST | /explain | Signed, approximate patient-specific Shapley contributions |
 
-## Requests
+Prediction accepts any subset of the 54 clinical inputs using CSV aliases.
+Omitted inputs use explicit defaults. Explicit nulls, unknown keys (including
+leakage labels), invalid categories, non-finite numbers and out-of-range values
+return 422. Binary flags require integer 0/1. An empty object remains valid.
 
-- `/predict` body: any subset of the 54 CSV-aliased fields (`"Current Smoker"`,
-  `"EF-TTE"`, `"Region RWMA"`, …). `{}` is valid — defaults + frozen
-  imputation fill the rest. Leakage keys are ignored.
-- `/explain` body: `{"features": {...}, "target": "cad|lad|lcx|rca", "top_k": 1–60}`.
+Explanation request:
 
-## Examples
-
-```bash
-cd backend && uvicorn main:app --host 0.0.0.0 --port 8000
-curl localhost:8000/health
-curl -X POST localhost:8000/predict -H 'Content-Type: application/json' -d '{}'
-curl -X POST localhost:8000/predict -H 'Content-Type: application/json' \
-  -d '{"Age": 66, "BP": 100, "Typical Chest Pain": 0}'
-curl -X POST localhost:8000/explain -H 'Content-Type: application/json' \
-  -d '{"target":"cad","top_k":3}'
+```json
+{"features":{"Age":66,"Typical Chest Pain":1},"target":"cad","top_k":10}
 ```
 
-Observed: `{}` → CAD 0.545 / LAD 0.485 / LCX 0.345 / RCA 0.389; a real dataset
-CAD row → CAD 0.73.
+Targets are cad/lad/lcx/rca; top_k is 1–60. See
+[explainability](explainability.md) for method, units and additivity.
 
-## Ops notes
+Missing prediction artifacts return 503. `/model-info` also returns 503 if
+saved evaluation metadata is missing or inconsistent. Execution errors return
+422. Models and backgrounds are cached; restart after replacing artifacts.
+`ARTIFACTS_DIR` overrides their location.
 
-- `ARTIFACTS_DIR` overrides artifact location; without artifacts,
-  predict/explain 503 while `/health` reports `"artifacts_loaded": false`.
-- ML pins must match training's (`scikit-learn==1.7.2`, `xgboost==3.2.0`, …)
-  or unpickling fails. `shap` is optional (fallback covers its absence).
-- CORS is wide-open for demo; auth/rate-limiting/persistence are absent by
-  design (stateless prototype).
+The frontend defaults to live calls through `/api` (Vite development proxy).
+Production needs a reverse proxy or an explicitly configured API origin.
+Mock mode is opt-in and visibly labelled; failed live requests never return mock results.
+CORS is open for the local prototype; auth, persistence and rate limiting are absent.

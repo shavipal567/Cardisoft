@@ -1,316 +1,181 @@
-import { useMemo, useRef, useState } from "react";
+import { Component, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import type { ComponentRef, ReactNode, RefObject } from "react";
 import * as THREE from "three";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Html } from "@react-three/drei";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { OrbitControls, Html, Line, useGLTF } from "@react-three/drei";
 import type { Target, Vessel } from "../api";
 import { riskColor } from "../fields";
+import { ARTERY_RADIUS, loadCoronaries, LABEL_FRACTION, registerHeart, VESSELS, VESSEL_META } from "../anatomy/coronary";
 
-// ---------------------------------------------------------------------------
-// Anatomical heart surface
-// ---------------------------------------------------------------------------
-// Broad base (great vessels) tapering to an apex that bends to the patient's
-// left and slightly anterior. Two sulci are carved into the surface:
-//   - coronary (atrioventricular) sulcus: ring at phi ~= 0.85
-//   - anterior interventricular sulcus: groove at theta ~= 0.2, phi > 0.85
-// Vessels are generated on this SAME surface so they sit in the sulci.
-const A = 0.95; // half-width  (patient left-right)
-const B = 1.2; // half-height (base to apex)
-const C = 0.9; // half-depth  (anterior-posterior)
+const GLB_URL = "/heart.glb";
+useGLTF.preload(GLB_URL);
 
-const CORONARY_PHI = 0.85;
-const AIS_THETA = 0.2;
+type View = "Anterior" | "Left lateral" | "Posterior" | "Right lateral";
+const VIEWS: Record<View, [number, number, number]> = {
+  Anterior: [0, 0.1, 4.5],
+  "Left lateral": [4.5, 0.1, 0],
+  Posterior: [0, 0.1, -4.5],
+  "Right lateral": [-4.5, 0.1, 0],
+};
 
-function toAnatomicalHeart(v: THREE.Vector3, s: number) {
-  const theta = Math.atan2(v.x, v.z);
-  const phi = Math.acos(THREE.MathUtils.clamp(v.y, -1, 1));
-
-  let x = v.x * A * s;
-  let y = v.y * B * s;
-  let z = v.z * C * s;
-
-  // apex taper + bend (patient's left, slightly anterior)
-  if (y < 0) {
-    const t = Math.min(-y / (B * s), 1);
-    const pinch = 1 - 0.55 * t * t;
-    x *= pinch;
-    z *= pinch;
-    x += 0.35 * t * t * s;
-    z += 0.15 * t * t * s;
+class HeartErrorBoundary extends Component<{ children: ReactNode }, { error: boolean }> {
+  state = { error: false };
+  static getDerivedStateFromError() { return { error: true }; }
+  render() {
+    return this.state.error
+      ? <p className="error" role="alert">The 3D heart could not be loaded. Vessel estimates remain available below.</p>
+      : this.props.children;
   }
-
-  // flatten the base where the great vessels attach
-  if (y > 0.55 * B * s) {
-    const t = (y - 0.55 * B * s) / (0.45 * B * s);
-    y = 0.55 * B * s + (y - 0.55 * B * s) * (1 - 0.18 * t);
-  }
-
-  // carve sulci (radial inward displacement)
-  let groove = 0.06 * Math.exp(-Math.pow((phi - CORONARY_PHI) / 0.13, 2));
-  const aisFade = THREE.MathUtils.smoothstep(phi, CORONARY_PHI - 0.1, CORONARY_PHI + 0.15);
-  groove += 0.05 * Math.exp(-Math.pow((theta - AIS_THETA) / 0.13, 2)) * aisFade;
-
-  const len = Math.sqrt(x * x + y * y + z * z) || 1;
-  const disp = groove * s;
-  x -= (x / len) * disp;
-  y -= (y / len) * disp;
-  z -= (z / len) * disp;
-
-  v.set(x, y, z);
-  return v;
 }
 
-// theta: around the heart (0 = anterior, +90deg = patient's left)
-// phi: 0 = base, PI = apex
-function onSurface(theta: number, phi: number) {
-  const v = new THREE.Vector3(
-    Math.sin(phi) * Math.sin(theta),
-    Math.cos(phi),
-    Math.sin(phi) * Math.cos(theta)
-  );
-  return toAnatomicalHeart(v, 1.03);
+function CameraControls({ view, revision, zoom, onRotate }: { view: View; revision: number; zoom: { factor: number; sequence: number }; onRotate: () => void }) {
+  const { camera, size } = useThree();
+  const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
+  useEffect(() => {
+    const framing = Math.max(1, 1.12 / (size.width / size.height));
+    camera.position.set(...VIEWS[view]).multiplyScalar(framing);
+    camera.up.set(0, 1, 0);
+    camera.lookAt(0, -0.05, 0);
+    controls.current?.target.set(0, -0.05, 0);
+    controls.current?.update();
+  }, [camera, view, revision, size.width, size.height]);
+  useEffect(() => {
+    if (!zoom.sequence || !controls.current) return;
+    const target = controls.current.target;
+    const offset = camera.position.clone().sub(target);
+    offset.setLength(THREE.MathUtils.clamp(offset.length() * zoom.factor, 3, 9));
+    camera.position.copy(target).add(offset);
+    controls.current.update();
+  }, [camera, zoom]);
+  return <OrbitControls ref={controls} makeDefault enablePan={false} minDistance={3} maxDistance={9}
+    minPolarAngle={0.2} maxPolarAngle={Math.PI - 0.2} onStart={onRotate} />;
 }
 
-// [theta, phi] waypoints. Anatomical routes: LAD down the anterior
-// interventricular sulcus, LCX around the left AV groove, RCA around the
-// right AV groove toward the crux.
-const PATHS: Record<Vessel, [number, number][]> = {
-  LAD: [[0.3, 0.5], [0.25, 0.8], [0.22, 1.1], [0.2, 1.5], [0.18, 1.95], [0.16, 2.4], [0.15, 2.6]],
-  LCX: [[0.45, 0.65], [0.85, 0.8], [1.35, 0.88], [1.85, 0.95], [2.35, 1.02], [2.8, 1.08]],
-  RCA: [[-0.35, 0.65], [-0.8, 0.8], [-1.3, 0.92], [-1.8, 1.08], [-2.3, 1.3], [-2.75, 1.6]],
-};
-const LABEL_T: Record<Vessel, number> = { LAD: 0.45, LCX: 0.2, RCA: 0.2 };
-const VESSELS: Vessel[] = ["LAD", "LCX", "RCA"];
-
-const VESSEL_META: Record<Vessel, { full: string; territory: string; mesh: string }> = {
-  LAD: { full: "Left Anterior Descending", territory: "Anterior wall + septum", mesh: "LAD_MESH_01" },
-  LCX: { full: "Left Circumflex", territory: "Lateral (marginal) wall", mesh: "LCX_MESH_02" },
-  RCA: { full: "Right Coronary Artery", territory: "Right + inferior wall → PDA", mesh: "RCA_MESH_03" },
-};
-
-// Technical annotation anchors (scene units, schematic only)
-const ANCHORS = {
-  aorta: new THREE.Vector3(0.25, 1.5, 0.4),
-  pulmonary: new THREE.Vector3(-0.72, 1.35, 0.42),
-  svc: new THREE.Vector3(-0.82, 1.5, -0.05),
-  apex: new THREE.Vector3(0.45, -1.5, 0.3),
-  anterior: new THREE.Vector3(0, 0.25, 1.4),
-  posterior: new THREE.Vector3(0, 0.25, -1.4),
-  left: new THREE.Vector3(1.6, 0.1, 0),
-  right: new THREE.Vector3(-1.6, 0.1, 0),
-};
-
-function buildVessel(name: Vessel) {
-  const param = new THREE.CatmullRomCurve3(PATHS[name].map(([t, p]) => new THREE.Vector3(t, p, 0)));
-  const pts = param.getPoints(60).map((q) => onSurface(q.x, q.y));
-  const curve = new THREE.CatmullRomCurve3(pts);
-  return {
-    geometry: new THREE.TubeGeometry(curve, 120, 0.055, 12, false),
-    labelAt: curve.getPoint(LABEL_T[name]).multiplyScalar(1.25),
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Great vessels (anatomical colour convention: red = arterial, blue = venous)
-// ---------------------------------------------------------------------------
-type GreatVessel = {
-  name: string;
-  points: [number, number, number][];
-  radius: number;
-  kind: "arterial" | "venous";
-};
-
-const GREAT_VESSELS: GreatVessel[] = [
-  {
-    name: "AORTA",
-    points: [
-      [0.0, 0.85, 0.18],
-      [0.0, 1.4, 0.12],
-      [0.15, 1.8, -0.12],
-      [0.42, 1.9, -0.42],
-      [0.5, 1.6, -0.66],
-      [0.5, 1.15, -0.76],
-    ],
-    radius: 0.16,
-    kind: "arterial",
-  },
-  {
-    name: "PULMONARY TRUNK",
-    points: [
-      [-0.18, 0.8, 0.42],
-      [-0.32, 1.2, 0.34],
-      [-0.48, 1.55, 0.08],
-      [-0.58, 1.7, -0.22],
-    ],
-    radius: 0.15,
-    kind: "venous",
-  },
-  {
-    name: "SVC",
-    points: [
-      [-0.5, 0.95, 0.12],
-      [-0.56, 1.4, 0.06],
-      [-0.58, 1.75, 0.0],
-    ],
-    radius: 0.11,
-    kind: "venous",
-  },
-  {
-    name: "IVC",
-    points: [
-      [-0.5, 0.85, -0.12],
-      [-0.56, 0.45, -0.18],
-      [-0.58, 0.05, -0.22],
-    ],
-    radius: 0.11,
-    kind: "venous",
-  },
-];
-
-function buildTube(points: [number, number, number][], radius: number) {
-  const curve = new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(...p)));
-  return new THREE.TubeGeometry(curve, 64, radius, 12, false);
-}
-
-function vesselColor(kind: "arterial" | "venous", dark: boolean) {
-  if (kind === "arterial") return dark ? "#b03040" : "#d64545";
-  return dark ? "#3a5a9a" : "#4a7fc1";
-}
-
-function myocardiumColor(dark: boolean) {
-  return dark ? "#4a2d38" : "#a04a58";
-}
-
-function Auricles({ dark }: { dark: boolean }) {
-  const color = myocardiumColor(dark);
-  return (
-    <group>
-      {/* right auricle: broad flap wrapping toward the aorta */}
-      <mesh position={[-0.5, 1.0, 0.42]} rotation={[0.2, 0.3, -0.4]} scale={[0.34, 0.26, 0.2]}>
-        <sphereGeometry args={[1, 24, 16]} />
-        <meshStandardMaterial color={color} roughness={0.85} />
-      </mesh>
-      {/* left auricle: narrow, curved, over the pulmonary trunk */}
-      <mesh position={[0.55, 0.92, 0.38]} rotation={[0.3, -0.4, 0.5]} scale={[0.24, 0.2, 0.34]}>
-        <sphereGeometry args={[1, 24, 16]} />
-        <meshStandardMaterial color={color} roughness={0.85} />
-      </mesh>
-    </group>
-  );
-}
-
-function HeartBody({ dark }: { dark: boolean }) {
-  const geometry = useMemo(() => {
-    const g = new THREE.SphereGeometry(1, 96, 64);
-    const p = g.attributes.position;
-    const v = new THREE.Vector3();
-    for (let i = 0; i < p.count; i++) {
-      v.fromBufferAttribute(p, i);
-      toAnatomicalHeart(v, 1);
-      p.setXYZ(i, v.x, v.y, v.z);
-    }
-    g.computeVertexNormals();
-    return g;
-  }, []);
-
-  const greatVessels = useMemo(
-    () => GREAT_VESSELS.map((gv) => ({ ...gv, geometry: buildTube(gv.points, gv.radius) })),
-    []
-  );
-
-  return (
-    <group>
-      <mesh geometry={geometry}>
-        <meshStandardMaterial color={myocardiumColor(dark)} roughness={0.85} />
-      </mesh>
-      {greatVessels.map((gv) => (
-        <mesh key={gv.name} geometry={gv.geometry}>
-          <meshStandardMaterial color={vesselColor(gv.kind, dark)} roughness={0.7} />
-        </mesh>
-      ))}
-      <Auricles dark={dark} />
-    </group>
-  );
-}
-
-function TechLabel({ position, title, sub }: { position: THREE.Vector3; title: string; sub?: string }) {
-  return (
-    <Html position={position} center style={{ pointerEvents: "none" }}>
-      <div className="tlabel">
-        <b>{title}</b>
-        {sub && <span>{sub}</span>}
-      </div>
-    </Html>
-  );
-}
-
-function VesselMesh(props: {
-  name: Vessel;
-  probability?: number;
-  prediction?: number;
-  selected: boolean;
-  onSelect: (t: Target) => void;
+function Artery({ points, color, selected = false, onSelect }: {
+  points: THREE.Vector3[]; color: string; selected?: boolean; onSelect?: () => void;
 }) {
-  const { name, probability, prediction, selected, onSelect } = props;
-  const [hover, setHover] = useState(false);
-  const built = useMemo(() => buildVessel(name), [name]);
-  const color = probability === undefined ? "#94a3b8" : riskColor(probability);
-  const pct = probability === undefined ? "—" : `${(probability * 100).toFixed(0)}%`;
-  const cls = prediction === undefined ? "n/a" : prediction === 1 ? "POS" : "NEG";
-
-  return (
-    <group>
-      <mesh
-        geometry={built.geometry}
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelect(name);
-        }}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          setHover(true);
-          document.body.style.cursor = "pointer";
-        }}
-        onPointerOut={() => {
-          setHover(false);
-          document.body.style.cursor = "auto";
-        }}
-      >
-        <meshStandardMaterial
-          color={color}
-          emissive={color}
-          emissiveIntensity={selected ? 0.55 : hover ? 0.35 : 0.1}
-        />
-      </mesh>
-      <Html position={built.labelAt} center style={{ pointerEvents: "none" }}>
-        <div className={"vlabel tech" + (selected ? " sel" : "")}>
-          <b>{name} · {pct}</b>
-          <span>{VESSEL_META[name].full}</span>
-          <span className="vsub">{cls} · {VESSEL_META[name].mesh}</span>
-        </div>
-      </Html>
-    </group>
-  );
+  const [geometry, outline] = useMemo(() => {
+    const curve = new THREE.CatmullRomCurve3(points);
+    const segments = Math.max(64, points.length * 2);
+    return [
+      new THREE.TubeGeometry(curve, segments, ARTERY_RADIUS * 1.6, 12, false),
+      new THREE.TubeGeometry(curve, segments, ARTERY_RADIUS * 2.3, 12, false),
+    ];
+  }, [points]);
+  useEffect(() => () => { geometry.dispose(); outline.dispose(); }, [geometry, outline]);
+  return <group onClick={onSelect ? (event) => { event.stopPropagation(); onSelect(); } : undefined}>
+    <mesh geometry={outline} renderOrder={1}>
+      <meshBasicMaterial color={selected ? "#ffffff" : "#101d2b"} side={THREE.BackSide}
+        depthWrite={false} toneMapped={false} />
+    </mesh>
+    <mesh geometry={geometry} renderOrder={2}>
+      <meshBasicMaterial color={color} toneMapped={false} />
+    </mesh>
+  </group>;
 }
 
-/** Gentle lub-dub pulse; off when the user prefers reduced motion. */
-function Beat({ children }: { children: React.ReactNode }) {
-  const ref = useRef<THREE.Group>(null);
-  const reduce = useMemo(
-    () =>
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-    []
-  );
-  useFrame(({ clock }) => {
-    if (!ref.current || reduce) return;
-    const ph = (clock.getElapsedTime() % 0.833) / 0.833;
-    const beat =
-      Math.exp(-Math.pow((ph - 0.12) / 0.07, 2)) +
-      0.6 * Math.exp(-Math.pow((ph - 0.32) / 0.08, 2));
-    ref.current.scale.setScalar(1 + 0.012 * beat);
+type LabelElements = RefObject<Partial<Record<Vessel, HTMLButtonElement>>>;
+
+// Labels live in the main React DOM root. Project their anchors from R3F;
+// independent Html roots can lose their first label on Suspense/StrictMode remounts.
+function VesselLabel({ name, route, occluder, labels }: {
+  name: Vessel; route: { points: THREE.Vector3[]; normals: THREE.Vector3[] };
+  occluder: THREE.Object3D; labels: LabelElements;
+}) {
+  const index = Math.round(LABEL_FRACTION[name] * (route.points.length - 1));
+  const anchor = route.points[index];
+  const position = useMemo(() => {
+    const p = anchor.clone().addScaledVector(route.normals[index], 0.38);
+    p.x += name === "RCA" ? -0.30 : 0.30;
+    if (name === "LCX") p.y += 0.12;
+    return p;
+  }, [anchor, route, index, name]);
+  const ray = useMemo(() => new THREE.Raycaster(), []);
+  const projected = useMemo(() => new THREE.Vector3(), []);
+  const direction = useMemo(() => new THREE.Vector3(), []);
+  useFrame(({ camera, size }) => {
+    const label = labels.current[name];
+    if (!label) return;
+    camera.updateMatrixWorld();
+    projected.copy(position).project(camera);
+    direction.subVectors(position, camera.position);
+    const distance = direction.length();
+    ray.set(camera.position, direction.normalize());
+    const hit = ray.intersectObject(occluder, true)[0];
+    const visible = projected.z > -1 && projected.z < 1 && (!hit || hit.distance > distance);
+    label.style.setProperty("visibility", visible ? "visible" : "hidden");
+    const halfWidth = label.offsetWidth / 2 + 6;
+    const halfHeight = label.offsetHeight / 2 + 6;
+    label.style.setProperty("left", `${THREE.MathUtils.clamp((projected.x + 1) * size.width / 2, halfWidth, size.width - halfWidth)}px`);
+    label.style.setProperty("top", `${THREE.MathUtils.clamp((1 - projected.y) * size.height / 2, halfHeight, size.height - halfHeight)}px`);
   });
-  return <group ref={ref}>{children}</group>;
+  return <Line points={[anchor, position]} color="#d4dce7" lineWidth={1} />;
+}
+
+function RegisteredHeart({ probabilities, selected, onSelect, labels, focus, showRoutes, opacity }: Pick<Props, "probabilities" | "selected" | "onSelect"> & { labels: LabelElements; focus: boolean; showRoutes: boolean; opacity: number }) {
+  const gltf = useGLTF(GLB_URL);
+  const invalidate = useThree((state) => state.invalidate);
+  const { heart, materials } = useMemo(() => {
+    const heart = registerHeart(gltf.scene);
+    const materials = new Map<THREE.Material, { muted: THREE.MeshStandardMaterial; coloured: THREE.Material }>();
+    heart.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      for (const source of Array.isArray(object.material) ? object.material : [object.material]) {
+        if (!materials.has(source)) {
+          // Clone the material, keeping the cached GLB and its textures intact.
+          const coloured = source.clone();
+          coloured.transparent = true;
+          coloured.depthWrite = false;
+          coloured.side = THREE.FrontSide;
+          materials.set(source, {
+            muted: new THREE.MeshStandardMaterial({
+              color: "#617586", roughness: 0.95, metalness: 0, side: source.side,
+            }),
+            coloured,
+          });
+        }
+      }
+    });
+    return { heart, materials };
+  }, [gltf.scene]);
+  useEffect(() => {
+    materials.forEach(({ coloured }) => {
+      coloured.opacity = opacity;
+      const transparent = opacity < 1;
+      if (coloured.transparent !== transparent) {
+        coloured.transparent = transparent;
+        coloured.needsUpdate = true;
+      }
+      coloured.depthWrite = !transparent;
+    });
+    const originals = new Map([...materials].flatMap(([source, variants]) =>
+      [[variants.muted, source], [variants.coloured, source]] as [THREE.Material, THREE.Material][]));
+    heart.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      const swap = (material: THREE.Material) => {
+        const source = originals.get(material) ?? material;
+        const variants = materials.get(source);
+        return variants ? (focus ? variants.muted : variants.coloured) : source;
+      };
+      object.material = Array.isArray(object.material) ? object.material.map(swap) : swap(object.material);
+    });
+    invalidate();
+  }, [heart, materials, focus, opacity, invalidate]);
+  useEffect(() => () => { materials.forEach(({ muted, coloured }) => { muted.dispose(); coloured.dispose(); }); }, [materials]);
+  const arteries = useMemo(() => loadCoronaries(), []);
+  return <>
+    <primitive object={heart} />
+    {showRoutes && <>
+    <Artery points={arteries.leftMain} color="#e6cba4" />
+    <Artery points={arteries.rightOrigin} color={probabilities.RCA === undefined ? "#d7c7b6" : riskColor(probabilities.RCA)} />
+    {VESSELS.map((name) => <group key={name}>
+      <Artery points={arteries.routes[name].points}
+        color={probabilities[name] === undefined ? "#d7c7b6" : riskColor(probabilities[name])}
+        selected={selected === name} onSelect={() => onSelect(name)} />
+      <VesselLabel name={name} route={arteries.routes[name]} occluder={heart} labels={labels} />
+    </group>)}
+    </>}
+  </>;
 }
 
 interface Props {
@@ -323,107 +188,161 @@ interface Props {
   dark: boolean;
 }
 
-export default function HeartViewer({
-  probabilities,
-  classifications,
-  cadProbability,
-  cadPrediction,
-  selected,
-  onSelect,
-  dark,
-}: Props) {
-  const selMeta = selected === "CAD" ? null : VESSEL_META[selected];
-  const selProb = selected === "CAD" ? cadProbability : probabilities[selected];
-  const selCls =
-    selected === "CAD"
-      ? cadPrediction
-      : classifications?.[selected];
-  return (
-    <div className="card">
-      <div className="heart-head">
-        <h3>Heart view — anatomical 3D</h3>
-        <span className="tech-tag">R3F · three r186 · proc. mesh · anterior view</span>
+export default function HeartViewer({ probabilities, classifications, selected, onSelect, dark }: Props) {
+  const labels = useRef<Partial<Record<Vessel, HTMLButtonElement>>>({});
+  const [focus, setFocus] = useState(true);
+  const [opacity, setOpacity] = useState(69);
+  const [showRoutes, setShowRoutes] = useState(true);
+  const [view, setView] = useState<View>("Anterior");
+  const [revision, setRevision] = useState(0);
+  const [rotated, setRotated] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [zoom, setZoom] = useState({ factor: 1, sequence: 0 });
+  const expandButton = useRef<HTMLButtonElement>(null);
+  const viewer = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!expanded) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setExpanded(false); expandButton.current?.focus(); }
+      if (event.key === "Tab" && viewer.current) {
+        const controls = [...viewer.current.querySelectorAll<HTMLElement>("button, input, summary, a[href], [tabindex='0']")]
+          .filter((element) => !element.matches(":disabled") && element.getClientRects().length && getComputedStyle(element).visibility !== "hidden");
+        const first = controls[0], last = controls.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    window.addEventListener("keydown", escape);
+    return () => { document.body.style.overflow = previous; window.removeEventListener("keydown", escape); };
+  }, [expanded]);
+
+  function resetView() {
+    setView("Anterior");
+    setRevision((n) => n + 1);
+    setRotated(false);
+  }
+  function locate(name: Vessel) {
+    setShowRoutes(true);
+    setView(name === "LCX" ? "Left lateral" : "Anterior");
+    setRevision((n) => n + 1);
+    setRotated(false);
+    onSelect(name);
+  }
+
+  return <div ref={viewer} className={"card coronary-viewer" + (expanded ? " expanded" : "")}
+    role={expanded ? "dialog" : undefined} aria-modal={expanded || undefined}
+    aria-label={expanded ? "Expanded heart anatomy" : undefined}>
+    <div className="heart-head">
+      <div><p className="eyebrow">EXPLORE IN 3D</p><h3>Heart anatomy</h3>
+        <p className="note">Select an artery to bring its course and estimate into focus.</p></div>
+      <div className="heart-header-actions">
+        <button onClick={resetView}>Reset view</button>
+        <button ref={expandButton} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+          {expanded ? "Exit expanded view" : "Expand view"}
+        </button>
       </div>
-      <div className="canvas-wrap tech-canvas">
-        <Canvas camera={{ position: [0, 0, 4.8], fov: 45 }}>
-          <ambientLight intensity={dark ? 0.9 : 1.1} />
-          <directionalLight position={[3, 4, 5]} intensity={1.0} />
-          <directionalLight position={[-3, -2, -4]} intensity={0.4} />
-          <gridHelper args={[9, 18, dark ? "#2d4663" : "#b9d2e6", dark ? "#1d3350" : "#dceaf4"]} position={[0, -1.95, 0]} />
-          <Beat>
-          <group rotation={[0, 0, 0.45]}>
-            <HeartBody dark={dark} />
-            {VESSELS.map((v) => (
-              <VesselMesh
-                key={v}
-                name={v}
-                probability={probabilities[v]}
-                prediction={classifications?.[v]}
-                selected={selected === v}
-                onSelect={onSelect}
-              />
-            ))}
-            <TechLabel position={ANCHORS.aorta} title="AORTA" sub="ascending + arch" />
-            <TechLabel position={ANCHORS.pulmonary} title="PULM TRUNK" sub="venous" />
-            <TechLabel position={ANCHORS.svc} title="SVC" sub="superior vena cava" />
-            <TechLabel position={ANCHORS.apex} title="APEX" sub="inferior tip" />
-            <TechLabel position={ANCHORS.anterior} title="ANT" sub="anterior" />
-            <TechLabel position={ANCHORS.posterior} title="POST" sub="posterior" />
-            <TechLabel position={ANCHORS.left} title="L" sub="pt. left" />
-            <TechLabel position={ANCHORS.right} title="R" sub="pt. right" />
-          </group>
-          </Beat>
-          <OrbitControls enablePan enableZoom enableRotate minDistance={2.5} maxDistance={8} />
-        </Canvas>
-        <div className="hud hud-tl">ANATOMICAL — SCHEMATIC · FOV 45° · CAM [0,0,4.8]</div>
-        <div className="hud hud-tr">
-          {selected === "CAD"
-            ? `SEL: CAD · ${cadProbability !== undefined ? `${(cadProbability * 100).toFixed(0)}% ${cadPrediction === 1 ? "POS" : "NEG"}` : "—"}`
-            : `SEL: ${selected} · ${selMeta?.mesh} · ${selProb !== undefined ? `${(selProb * 100).toFixed(0)}% ${selCls === 1 ? "POS" : "NEG"}` : "—"}`}
-        </div>
-        <div className="hud hud-br">PROCEDURAL MYOCARDIUM · SULCI + GREAT VESSELS · VESSEL TUBE 120×12 R0.055</div>
-      </div>
-      <table className="spec-table">
-        <thead>
-          <tr>
-            <th>Vessel / mesh</th>
-            <th>Territory (anatomical)</th>
-            <th>P(stenosis)</th>
-            <th>Class</th>
-            <th>Visual channel</th>
-          </tr>
-        </thead>
-        <tbody>
-          {VESSELS.map((v) => {
-            const p = probabilities[v];
-            const c = classifications?.[v];
-            return (
-              <tr key={v} className={selected === v ? "sel-row" : ""} onClick={() => onSelect(v)}>
-                <td><b>{v}</b> <span className="mono">{VESSEL_META[v].mesh}</span><br /><span className="muted">{VESSEL_META[v].full}</span></td>
-                <td>{VESSEL_META[v].territory}</td>
-                <td className="mono">{p === undefined ? "—" : `${(p * 100).toFixed(1)}%`}</td>
-                <td>
-                  <span className={"pill " + (c === 1 ? "pos" : "neg")}>
-                    {c === undefined ? "n/a" : c === 1 ? "POS" : "NEG"}
-                  </span>
-                </td>
-                <td><span className="swatch" style={{ background: p === undefined ? "#94a3b8" : riskColor(p) }} /> whole-mesh color + label</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <div className="legend-bar" />
-      <div className="legend-labels">
-        <span>0% lower model estimate</span>
-        <span>100% higher model estimate</span>
-      </div>
-      <p className="note">
-        Drag to rotate, scroll to zoom, right-drag to pan, click a vessel (3D or table row) to select it.
-        {selected === "CAD" ? " Overall CAD is selected: click a vessel to inspect it." : ` Selected: ${selected}.`}{" "}
-        Each vessel is coloured as a whole by its model-estimated probability; this does not show where a
-        narrowing is. A lower estimate does not rule out disease.
-      </p>
     </div>
-  );
+    <div className="heart-view-controls" role="group" aria-label="Heart viewing direction">
+      {(Object.keys(VIEWS) as View[]).map((name) => <button key={name} aria-pressed={!rotated && view === name}
+        onClick={() => { setView(name); setRevision((n) => n + 1); setRotated(false); }}>{name}</button>)}
+    </div>
+    <div className="heart-workspace">
+    <HeartErrorBoundary>
+      <div className="canvas-wrap tech-canvas" role="group" aria-label="Interactive coronary artery model">
+        <Canvas frameloop="demand" camera={{ position: VIEWS.Anterior, fov: 40 }} dpr={[1, 1.5]}>
+          <ambientLight intensity={dark ? 1.3 : 1.6} />
+          <directionalLight position={[2, 4, 5]} intensity={2} />
+          <directionalLight position={[-3, 1, -4]} intensity={1.4} />
+          <Suspense fallback={<Html center><span className="heart-loading">Loading heart anatomy…</span></Html>}>
+            <RegisteredHeart probabilities={probabilities} selected={selected} onSelect={onSelect} labels={labels} focus={focus} showRoutes={showRoutes} opacity={opacity / 100} />
+          </Suspense>
+          <CameraControls view={view} revision={revision} zoom={zoom} onRotate={() => setRotated(true)} />
+        </Canvas>
+        {showRoutes && VESSELS.map((name) => <button key={name}
+          ref={(element) => { if (element) labels.current[name] = element; else delete labels.current[name]; }}
+          className={"coronary-label" + (selected === name ? " selected" : "")}
+          aria-label={`Select ${VESSEL_META[name].full}`} aria-pressed={selected === name}
+          onClick={() => onSelect(name)}>
+          <b>{name}</b><span>{probabilities[name] === undefined ? "—" : `${Math.round(probabilities[name] * 100)}%`}</span>
+        </button>)}
+        <div className="hud hud-tl">{rotated ? "Rotated view" : `${view} view`}</div>
+        <div className="hud hud-tr">{showRoutes ? (selected === "CAD" ? "LAD · LCX · RCA highlighted" : `${selected} selected`) : "Original anatomy"}</div>
+        {!rotated && (view === "Anterior" || view === "Posterior") && <>
+          <span className="heart-side heart-side-left">Patient’s {view === "Anterior" ? "right" : "left"}</span>
+          <span className="heart-side heart-side-right">Patient’s {view === "Anterior" ? "left" : "right"}</span>
+        </>}
+        <div className="heart-zoom-controls" role="group" aria-label="Zoom controls">
+          <button aria-label="Zoom out" onClick={() => setZoom((z) => ({ factor: 1.18, sequence: z.sequence + 1 }))}>−</button>
+          <span>Drag to rotate · Pinch or scroll to zoom</span>
+          <button aria-label="Zoom in" onClick={() => setZoom((z) => ({ factor: 1 / 1.18, sequence: z.sequence + 1 }))}>+</button>
+        </div>
+      </div>
+    </HeartErrorBoundary>
+      <aside className="heart-inspector" aria-label="Artery and appearance controls">
+        <div className="heart-inspector-heading"><h4>Coronary arteries</h4><span>Select to locate</span></div>
+        <div className="heart-locate-controls" role="group" aria-label="Locate coronary artery">
+          {VESSELS.map((name) => <button key={name} aria-pressed={selected === name} onClick={() => locate(name)}>
+            <div className="artery-card-heading"><b><i style={{ background: probabilities[name] === undefined ? "#94a3b8" : riskColor(probabilities[name]) }} />{name}</b>
+              <strong>{probabilities[name] === undefined ? "—" : `${Math.round(probabilities[name] * 100)}%`}</strong></div>
+            <span>{VESSEL_META[name].full}</span>
+            <span className="artery-card-course">{VESSEL_META[name].course}</span>
+          </button>)}
+        </div>
+        <div className="heart-inspector-heading"><h4>Appearance</h4></div>
+        <div className="heart-display-controls" role="group" aria-label="Heart colour display">
+          <button aria-pressed={focus} onClick={() => setFocus(true)}>Vessel focus</button>
+          <button aria-pressed={!focus} onClick={() => setFocus(false)}>Original colours</button>
+        </div>
+        <div className={"heart-opacity-control" + (focus ? " inactive" : "")}>
+          <label htmlFor="heart-opacity">Heart opacity</label>
+          <output htmlFor="heart-opacity">{focus ? "Solid" : `${opacity}%`}</output>
+          <input id="heart-opacity" type="range" min={0} max={100} step={1} value={opacity} disabled={focus}
+            aria-valuetext={`${opacity} percent`} aria-describedby="heart-opacity-help"
+            onChange={(event) => setOpacity(Number(event.target.value))} />
+          <span>Transparent</span><span>Opaque</span>
+        </div>
+        <p className="note" id="heart-opacity-help">{focus ? "Choose Original colours to adjust transparency." : "Opacity changes the heart surface. Artery highlights stay solid."}</p>
+        <div className="heart-route-control">
+          <label><input type="checkbox" checked={showRoutes} onChange={(event) => setShowRoutes(event.target.checked)} />
+            Artery highlights &amp; labels</label>
+        </div>
+        <div className="heart-mini-legend"><div className="legend-bar" /><div className="legend-labels"><span>Lower estimate</span><span>Higher estimate</span></div></div>
+      </aside>
+    </div>
+    <p className="note heart-reference-note">Illustrative reference paths on the heart surface; not verified native-vessel segmentation or patient-specific anatomy.</p>
+    <details className="heart-details">
+      <summary>Artery details &amp; anatomy notes</summary>
+    <div className="coronary-table-wrap" tabIndex={0} role="region" aria-label="Coronary artery estimates">
+      <table className="spec-table">
+        <thead><tr><th>Artery</th><th>Reference course</th><th>Estimate</th><th>Class</th></tr></thead>
+        <tbody>{VESSELS.map((name) => {
+          const probability = probabilities[name];
+          const classification = classifications?.[name];
+          return <tr key={name} className={selected === name ? "sel-row" : ""}>
+            <td><button className="artery-select" onClick={() => onSelect(name)} aria-pressed={selected === name}>
+              <span className="swatch" style={{ background: probability === undefined ? "#d7c7b6" : riskColor(probability) }} />{name}
+            </button><br /><span className="muted">{VESSEL_META[name].full}</span></td>
+            <td>{VESSEL_META[name].course}</td>
+            <td>{probability === undefined ? "—" : `${(probability * 100).toFixed(1)}%`}</td>
+            <td><span className={"pill " + (classification === 1 ? "pos" : "neg")}>
+              {classification === undefined ? "—" : classification === 1 ? "Positive" : "Negative"}
+            </span></td>
+          </tr>;
+        })}</tbody>
+      </table>
+    </div>
+    <div className="legend-bar" />
+    <div className="legend-labels"><span>Lower model estimate</span><span>Higher model estimate</span></div>
+    {showRoutes && <p className="note">The reference routes illustrate how LAD and LCX share the left main coronary origin; RCA has a separate aortic origin.
+      Use the lateral and posterior views to follow the arteries around the heart. Small branches and
+      anatomical variants are omitted. The neutral segment marks the left main, which has no separate model estimate.</p>}
+    <p className="note">This is an illustrative model, not a patient scan or clinically validated reconstruction.
+      The table swatches and optional reference routes show whole-artery estimates. The original asset colours do not encode predictions.</p>
+    <p className="note heart-credits">Anatomy reference: <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4919754/" target="_blank" rel="noreferrer">normal coronary anatomy</a>.
+      {" "}Heart asset by <a href="https://sketchfab.com/3d-models/anatomically-correct-human-heart-54fa880728d14c11afff78be8721620a" target="_blank" rel="noreferrer">Pigcraft</a>
+      {" "}(<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>); orientation and overlays adapted.</p>
+    </details>
+  </div>;
 }
