@@ -15,7 +15,7 @@ class CatBoostNative:
     """CatBoostClassifier over integer-cast categorical columns."""
 
     def __init__(self, cat_features=(), **params):
-        self.cat_features = list(cat_features)
+        self.cat_features = cat_features
         self.params = dict(params)
         self.model = None
 
@@ -29,6 +29,8 @@ class CatBoostNative:
         from catboost import CatBoostClassifier
         if cat_features is not None:
             self.cat_features = list(cat_features)
+        elif not isinstance(self.cat_features, list):
+            self.cat_features = list(self.cat_features)
         self.model = CatBoostClassifier(**self.params)
         self.model.fit(self._frame(X), np.asarray(y).ravel(),
                        cat_features=self.cat_features)
@@ -46,7 +48,7 @@ class CatBoostNative:
         return np.asarray(self.model.feature_importances_, dtype=float)
 
     def get_params(self, deep=True):
-        return {"cat_features": list(self.cat_features), **self.params}
+        return {"cat_features": self.cat_features, **self.params}
 
     def set_params(self, **params):
         if "cat_features" in params:

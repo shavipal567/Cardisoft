@@ -113,6 +113,22 @@ requirements. Relevant sections: **PROBLEM.md §§4.2, 10–11**.
   correspond to the deployed artifacts.
 - [ ] Restart the backend after replacing cached artifacts and run regression checks.
 
+Reported training issues to resolve and verify:
+
+- [ ] Verify the `CatBoostNative` clone-compatibility fix through the voting-model
+  cross-validation path. The reported run stopped in
+  `training/voting.py::optimize_voting_weights_and_threshold` when `clone(est)`
+  raised `RuntimeError: Cannot clone object ... as the constructor either does
+  not set or modifies parameter cat_features`. Preserve constructor parameters
+  through initialization and `get_params` so scikit-learn can clone the estimator.
+- [ ] Investigate repeated LightGBM warnings: `X does not have valid feature names,
+  but LGBMClassifier was fitted with feature names`. Keep feature names and column
+  order consistent between fitting and prediction; verify the cause before
+  considering any narrowly scoped warning suppression.
+- [ ] Rerun the affected training workflow and confirm voting-model evaluation
+  completes and final metrics/artifacts are written. Candidate scores printed
+  before the exception do not establish that the training run completed.
+
 Relevant sections: **PROBLEM.md §§22–25, 28.2, 31.4–31.5**.
 
 ### 8. Assess missing-input robustness
@@ -297,13 +313,21 @@ recordings and clinical rows must not be treated as paired patient examples.
 - [ ] Evaluate missing-modality and poor-quality-input scenarios separately.
 - [ ] Report measured improvements or lack of improvement; do not assume fusion helps.
 
-### Later modality options
+### Later modality and interaction options
 
-- **Echocardiography images/video:** requires suitable paired imaging data, compatible
-  target labels, and separately evaluated image/video processing and model pipelines.
-- **Clinical notes:** requires text modelling and strict leakage controls. Diagnostic
-  statements, angiography conclusions, and post-diagnosis information may reveal
-  the prediction target and must not be used as legitimate pre-prediction inputs.
+| Addition | What it contributes | What it requires |
+|---|---|---|
+| Echocardiography video analysis | Learns motion and structural information from ultrasound clips | Paired echo videos, clinical data, and suitable outcome labels |
+| Clinical-note understanding | Extracts symptoms, history, and context from narrative text | Notes available before diagnosis, with strict target-leakage control |
+| Longitudinal measurements | Combines changing vitals or wearable signals with a clinical assessment | Patient-linked time series and clearly defined prediction timing |
+| Cross-modal consistency checks | Flags conflicting information, such as disagreement between recorded findings and signal-derived findings | Validated comparison methods and a clear review workflow |
+| Modality-aware confidence | Communicates how missing or poor-quality inputs affect reliability | Calibration and validation across different input combinations |
+| Interactive modality comparison | Lets users compare tabular-only, ECG-only, and combined predictions | Separately evaluated models and clearly labelled comparisons |
+
+Echocardiography analysis also requires separately evaluated image/video processing
+and model pipelines. For clinical notes, diagnostic statements, angiography
+conclusions, and post-diagnosis information may reveal the prediction target and
+must not be used as legitimate pre-prediction inputs.
 
 This roadmap extends the current prototype. It should not be described as an
 already implemented capability or as an additional mandatory requirement of

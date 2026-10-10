@@ -44,9 +44,9 @@ Email: reman.airport@gmail.com}
 Coronary artery disease (CAD) remains the leading cause of mortality worldwide, necessitating early and accurate risk stratification tools. We present \textbf{Cardisoft}, a research prototype clinical decision support system that predicts CAD and vessel-specific stenosis (LAD, LCX, RCA) from structured clinical measurements of 303 patients. The system employs a leakage-safe machine learning pipeline with repeated cross-validation model selection across seven model families and 32 configurations per target. Our best models achieve test ROC-AUC of 0.893 (CAD), 0.843 (LAD), 0.711 (LCX), and 0.748 (RCA). We provide patient-specific explanations via grouped permutation Shapley values and an interactive 3D schematic heart visualization. The system architecture separates training from serving, enforces strict leakage prevention through allow-list validation, and maintains reproducibility through version-pinned dependencies and committed artifacts. All predictions are uncalibrated model estimates, and the system is designed as a decision-support prototype rather than a diagnostic tool. We honestly report limitations including weak vessel-level recall for LCX (0.458) and RCA (0.391), and outline a roadmap for calibration, vessel-dependence modeling, and multimodal fusion.
 \end{abstract}
 
-\begin{keywords}
+\begin{IEEEkeywords}
 Coronary artery disease, clinical decision support, machine learning, explainable AI, Shapley values, leakage prevention, permutation explainability, gradient boosting, random forest
-\end{keywords}
+\end{IEEEkeywords}
 
 \section{Introduction}
 
@@ -128,6 +128,8 @@ The dataset comprises 303 patient records with 59 columns and zero missing value
 \centering
 \caption{Target Variables and Class Balance}
 \label{tab:targets}
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
 \begin{tabular}{lccc}
 \toprule
 \textbf{Target} & \textbf{CSV Column} & \textbf{Positive} & \textbf{Prevalence} \\
@@ -146,7 +148,9 @@ The 54 input features span seven clinical categories:
 \centering
 \caption{Input Feature Categories}
 \label{tab:features}
-\begin{tabular}{cl}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{cp{2.25in}}
 \toprule
 \textbf{Category} & \textbf{Features} \\
 \midrule
@@ -166,16 +170,16 @@ The dataset exhibits several known quirks that are handled explicitly in the pre
 \begin{itemize}
     \item \textbf{Sex typo}: The value \texttt{Fmale} appears in 127 rows and is normalized to \texttt{Female}
     \item \textbf{Region RWMA codes}: Integer codes 0--4 with undocumented anatomical mapping; treated as categorical
-    \item \textbf{Near-constant features}: CHF (1 positive), LowTH Ang (2 positives) — kept with regularization
-    \item \textbf{Rare categorical levels}: CRF, CVA, Weak Peripheral Pulse, Diastolic Murmur, Poor R Progression, Lung rales, Airway disease (all n$<$12) — unstable under CV but kept faithfully
-    \item \textbf{Outliers}: TG 1050, FBS 400, BP 190, PR 110, WBC 18000, PLT 25/742, HDL 111, BUN 52 — reviewed but never blind-dropped
+    \item \textbf{Near-constant features}: CHF (1 positive), LowTH Ang (2 positives) --- kept with regularization
+    \item \textbf{Rare categorical levels}: CRF, CVA, Weak Peripheral Pulse, Diastolic Murmur, Poor R Progression, Lung rales, Airway disease (all n$<$12) --- unstable under CV but kept faithfully
+    \item \textbf{Outliers}: TG 1050, FBS 400, BP 190, PR 110, WBC 18000, PLT 25/742, HDL 111, BUN 52 --- reviewed but never blind-dropped
     \item \textbf{Collinear pairs}: Neut/Lymph (differentials), Weight/Length/BMI/Obesity
 \end{itemize}
 
 The label structure reveals important relationships between targets:
 
 \begin{itemize}
-    \item P(CAD $|$ vessel stenotic): LAD 0.994, LCX 1.0, RCA 1.0 — CAD is nearly a deterministic OR of the three vessel labels
+    \item P(CAD $|$ vessel stenotic): LAD 0.994, LCX 1.0, RCA 1.0 --- CAD is nearly a deterministic OR of the three vessel labels
     \item P(vessel $|$ CAD): LAD 0.815, LCX 0.551, RCA 0.528
     \item Co-occurrence: LCX$\rightarrow$LAD 81\%, RCA$\rightarrow$LAD 76\%, LAD$\rightarrow$LCX 54\% / RCA 49\%
 \end{itemize}
@@ -209,15 +213,20 @@ Preprocessors are fitted exclusively on training data:
 
 The 61-row test split is never used during fitting, selection, or preprocessing. Post-training verification confirms that no leakage columns appear in transformed feature names:
 
+\begin{footnotesize}
 \begin{verbatim}
 python3 -c "
 import joblib
-names = list(joblib.load('artifacts/cad/preprocessor.joblib')
-    .get_feature_names_out())
-print([n for n in names if any(l in n for l in
-    ['LAD','LCX','RCA','Cath'])] or 'NONE - ok')
+p = joblib.load(
+  'artifacts/cad/preprocessor.joblib')
+n = list(p.get_feature_names_out())
+bad = ['LAD','LCX','RCA','Cath']
+print([x for x in n
+  if any(b in x for b in bad)]
+  or 'NONE - ok')
 "
 \end{verbatim}
+\end{footnotesize}
 
 \subsection{Preprocessing}
 
@@ -261,7 +270,7 @@ Used by the voting ensemble. Identical one-hot encoding to the one-hot track, fo
 \begin{itemize}
     \item \textbf{Numerical features (33)}: Same as one-hot track
     \item \textbf{Categorical features (21)}: Same one-hot encoding as one-hot track
-    \item \textbf{Post-scaling}: \texttt{StandardScaler(with\_mean=False)} — unit variance for all 81 columns
+    \item \textbf{Post-scaling}: \texttt{StandardScaler(with\_mean=False)} --- unit variance for all 81 columns
 \end{itemize}
 
 Total: 81 columns with unit variance.
@@ -278,34 +287,36 @@ Total: 81 columns with unit variance.
 
 \subsection{Model Selection}
 
-We evaluate 32 configurations per target across seven model families:
+We evaluate 32 configurations per target across seven model families (Table~\ref{tab:configs}).
 
-\begin{table}[htbp]
+% Full-width (two-column spanning) table so long hyperparameter strings fit.
+\begin{table*}[!t]
 \centering
 \caption{Model Configuration Space}
 \label{tab:configs}
-\begin{tabular}{llcc}
+\small
+\begin{tabular}{llcp{0.58\textwidth}}
 \toprule
-\textbf{Model} & \textbf{Track} & \textbf{Configurations} & \textbf{Key Hyperparameters} \\
+\textbf{Model} & \textbf{Track} & \textbf{Configs} & \textbf{Key Hyperparameters} \\
 \midrule
-Random Forest & one-hot & 8 & n\_estimators $\in \{200, 400\}$, max\_depth $\in \{8, \text{None}\}$, min\_samples\_leaf $\in \{1, 2\}$ \\
-XGBoost & one-hot & 8 & n\_estimators $\in \{200, 400\}$, max\_depth $\in \{3, 4\}$, learning\_rate $\in \{0.05, 0.1\}$ \\
-HistGradientBoosting & one-hot & 4 & max\_leaf\_nodes $\in \{15, 31\}$, min\_samples\_leaf $\in \{10, 20\}$ \\
-LightGBM & native & 6 & num\_leaves $\in \{7, 15, 31\}$, min\_child\_samples $\in \{10, 20\}$ \\
-CatBoost & native & 4 & depth $\in \{4, 6\}$, l2\_leaf\_reg $\in \{3, 10\}$ \\
+Random Forest & one-hot & 8 & \texttt{n\_estimators} $\in \{200, 400\}$, \texttt{max\_depth} $\in \{8, \text{None}\}$, \texttt{min\_samples\_leaf} $\in \{1, 2\}$ \\
+XGBoost & one-hot & 8 & \texttt{n\_estimators} $\in \{200, 400\}$, \texttt{max\_depth} $\in \{3, 4\}$, \texttt{learning\_rate} $\in \{0.05, 0.1\}$ \\
+HistGradientBoosting & one-hot & 4 & \texttt{max\_leaf\_nodes} $\in \{15, 31\}$, \texttt{min\_samples\_leaf} $\in \{10, 20\}$ \\
+LightGBM & native & 6 & \texttt{num\_leaves} $\in \{7, 15, 31\}$, \texttt{min\_child\_samples} $\in \{10, 20\}$ \\
+CatBoost & native & 4 & \texttt{depth} $\in \{4, 6\}$, \texttt{l2\_leaf\_reg} $\in \{3, 10\}$ \\
 Stacking & one-hot & 1 & RF + XGB + HGB $\rightarrow$ LogReg \\
 Voting & voting & 1 & RF + XGB + HGB + LGBM + CatBoost + ElasticNet $\rightarrow$ soft vote \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 Model selection uses 10 repeats of stratified 5-fold cross-validation (seeds 42--51) on the 242-row training partition. Each configuration produces 50 CV scores (10 repeats $\times$ 5 folds). The winner is selected by:
 
 \begin{equation}
-\text{winner} = \arg\max_{c \in \mathcal{C}} \left( \text{mean\_cv\_roc\_auc}(c), \text{mean\_cv\_f1}(c) \right)
+\text{winner} = \arg\max_{c \in \mathcal{C}} \Big( \overline{\text{AUC}}_{\text{CV}}(c),\ \overline{\text{F1}}_{\text{CV}}(c) \Big)
 \end{equation}
 
-where the tuple comparison implements lexicographic ordering: highest mean CV ROC-AUC first, with mean F1 as tie-breaker.
+where $\overline{\text{AUC}}_{\text{CV}}(c)$ and $\overline{\text{F1}}_{\text{CV}}(c)$ are the mean cross-validated ROC-AUC and F1 of configuration $c$, and the tuple comparison implements lexicographic ordering: highest mean CV ROC-AUC first, with mean F1 as tie-breaker.
 
 Per-fold metrics recorded:
 \begin{itemize}
@@ -326,32 +337,38 @@ We compute approximate patient-specific grouped permutation Shapley values. The 
 For a patient $\mathbf{x}$, reference set $\mathcal{R}$, and feature groups $\mathcal{G}$:
 
 \begin{equation}
-\phi_i(\mathbf{x}) = \frac{1}{|\mathcal{R}|} \sum_{\mathbf{r} \in \mathcal{R}} \frac{1}{K} \sum_{k=1}^{K} \left[ P(\mathbf{x}_{\pi_k(1:i)}, \mathbf{r}_{\pi_k(i+1:n)}) - P(\mathbf{x}_{\pi_k(1:i-1)}, \mathbf{r}_{\pi_k(i:n)}) \right]
+\begin{split}
+\phi_i(\mathbf{x}) ={}& \frac{1}{|\mathcal{R}|} \sum_{\mathbf{r} \in \mathcal{R}} \frac{1}{K} \sum_{k=1}^{K} \Big[ \\
+& P(\mathbf{x}_{\pi_k(1:i)}, \mathbf{r}_{\pi_k(i+1:n)}) \\
+& - P(\mathbf{x}_{\pi_k(1:i-1)}, \mathbf{r}_{\pi_k(i:n)}) \Big]
+\end{split}
 \end{equation}
 
-where $\pi_k$ is a random permutation of feature indices and $K$ is the number of sampled orderings.
+where $\pi_k$ is a random permutation of feature indices and $K$ is the number of sampled orderings (Algorithm~\ref{alg:shapley}).
 
-\begin{algorithm}
+\begin{algorithm}[!t]
 \caption{Grouped Permutation Shapley}
 \label{alg:shapley}
+\footnotesize
+\algrenewcommand\algorithmicindent{0.9em}
 \begin{algorithmic}[1]
-\Require Model $m$, patient $\mathbf{x}$, background $\mathcal{B}$, groups $\mathcal{G}$
-\State $\text{contributions} \gets \mathbf{0}^{|\mathcal{G}|}$
+\Require Model $m$, patient $\mathbf{x}$, background $\mathcal{B}$, groups $\mathcal{G}$, orderings $K$
+\State $\boldsymbol{\phi} \gets \mathbf{0}^{|\mathcal{G}|}$
 \For{each reference $\mathbf{r} \in \mathcal{B}$}
     \For{$k = 1$ to $K$}
-        \State $\pi \gets \text{random\_permutation}(|\mathcal{G}|)$
-        \For{each $\pi$ and $\pi^{-1}$}
-            \State $\text{path} \gets [\mathbf{r}]$
+        \State $\pi \gets$ random permutation of $\mathcal{G}$
+        \For{$\sigma \in \{\pi,\ \mathrm{reverse}(\pi)\}$}
+            \State $\mathbf{z} \gets \mathbf{r}$;\quad $p_{\text{prev}} \gets m(\mathbf{z})$
             \For{$i = 1$ to $|\mathcal{G}|$}
-                \State $\text{path}[\pi_i] \gets \mathbf{x}[\pi_i]$
-                \State $\text{probs}[i] \gets m.\text{predict\_proba}(\text{path}[i])$
+                \State $\mathbf{z}[\sigma_i] \gets \mathbf{x}[\sigma_i]$
+                \State $p \gets m(\mathbf{z})$
+                \State $\phi_{\sigma_i} \gets \phi_{\sigma_i} + p - p_{\text{prev}}$
+                \State $p_{\text{prev}} \gets p$
             \EndFor
-            \State $\Delta \gets \text{diff}(\text{probs})$
-            \State $\text{contributions}[\pi] \gets \text{contributions}[\pi] + \Delta$
         \EndFor
     \EndFor
 \EndFor
-\State \Return $\text{contributions} / (|\mathcal{B}| \times K \times 2)$
+\State \Return $\boldsymbol{\phi} \,/\, (|\mathcal{B}| \cdot K \cdot 2)$
 \end{algorithmic}
 \end{algorithm}
 
@@ -393,16 +410,18 @@ Owns all model fitting and frozen inference:
 \end{itemize}
 
 Artifacts are saved per target:
+\begin{footnotesize}
 \begin{verbatim}
 artifacts/
-├── cad/{preprocessor.joblib, model.joblib,
-│        shap_background.npz, metadata.json}
-├── lad/{...}
-├── lcx/{...}
-├── rca/{...}
-├── metrics.json
-└── experiments.csv
+|-- cad/{preprocessor.joblib, model.joblib,
+|        shap_background.npz, metadata.json}
+|-- lad/{...}
+|-- lcx/{...}
+|-- rca/{...}
+|-- metrics.json
+`-- experiments.csv
 \end{verbatim}
+\end{footnotesize}
 
 \subsubsection{Serving Layer (\texttt{backend/})}
 
@@ -446,6 +465,8 @@ Table~\ref{tab:results} presents the locked test set results (61 patients, seed 
 \centering
 \caption{Held-out Test Metrics (n=61)}
 \label{tab:results}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
 \begin{tabular}{lcccccc}
 \toprule
 \textbf{Target} & \textbf{Acc} & \textbf{Prec} & \textbf{Rec} & \textbf{F1} & \textbf{AUC} & \textbf{TN/FP/FN/TP} \\
@@ -470,7 +491,9 @@ Mean CV ROC-AUC across 10 repeats:
 \centering
 \caption{Cross-Validation Results}
 \label{tab:cv}
-\begin{tabular}{llcc}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lp{1.45in}cc}
 \toprule
 \textbf{Target} & \textbf{Winner} & \textbf{CV AUC} & \textbf{CV F1} \\
 \midrule

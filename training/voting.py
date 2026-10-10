@@ -1,4 +1,5 @@
 import itertools
+import warnings
 
 import numpy as np
 from sklearn.base import clone
@@ -96,10 +97,13 @@ def optimize_voting_weights_and_threshold(estimators, X, y, cv=5, seed=42):
     y = np.asarray(y, dtype=int)
     skf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=seed)
     oof = np.zeros((len(y), len(estimators)))
-    for j, (_, est) in enumerate(estimators):
-        oof[:, j] = cross_val_predict(
-            clone(est), X, y, cv=skf, method="predict_proba",
-        )[:, 1]
+    for j, (name, est) in enumerate(estimators):
+        with warnings.catch_warnings():
+            if name == "lgbm":
+                warnings.filterwarnings("ignore", message="X does not have valid feature names")
+            oof[:, j] = cross_val_predict(
+                clone(est), X, y, cv=skf, method="predict_proba",
+            )[:, 1]
 
     individual_f2 = []
     for j in range(len(estimators)):
