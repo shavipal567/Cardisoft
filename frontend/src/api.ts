@@ -5,7 +5,13 @@ export type Vessel = Exclude<Target, "CAD">;
 export type Patient = Record<string, number>;
 
 export interface Pred { prediction: number; probability: number }
-export interface PredictResponse { cad: Pred; vessels: Record<Vessel, Pred> }
+export type InputValues = Record<string, number | string>;
+export interface PredictionContext {
+  effective_inputs: InputValues;
+  defaulted_inputs: string[];
+  models: Record<Target, { name: string; version: string; training_revision: string }>;
+}
+export interface PredictResponse { cad: Pred; vessels: Record<Vessel, Pred>; context?: PredictionContext }
 export interface FeatureContribution {
   name: string;
   value: number | string;
@@ -18,6 +24,7 @@ export interface ExplainResponse {
   features: FeatureContribution[];
   signed?: boolean; // false = importance only (no direction), e.g. the fallback method
   method?: string;
+  model_version?: string;
   note?: string;
 }
 
@@ -87,7 +94,8 @@ function normalizePredict(raw: unknown): PredictResponse {
   const missing = TARGET_KEYS.filter((t) => !out[t]);
   if (missing.length)
     throw new Error(`Unexpected /predict response (missing ${missing.join(", ")}). Keys: ${Object.keys(root).join(", ")}`);
-  return { cad: out.CAD!, vessels: { LAD: out.LAD!, LCX: out.LCX!, RCA: out.RCA! } };
+  return { cad: out.CAD!, vessels: { LAD: out.LAD!, LCX: out.LCX!, RCA: out.RCA! },
+    context: root.context as PredictionContext | undefined };
 }
 
 // "num__Age" -> "Age";  "cat__Sex_Male" -> "Sex"
@@ -131,6 +139,7 @@ function normalizeExplain(raw: unknown, target: Target, patient: Patient): Expla
     target,
     base_value: typeof r.base_value === "number" ? r.base_value : 0,
     method,
+    model_version: typeof r.model_version === "string" ? r.model_version : undefined,
     note: typeof r.note === "string" ? r.note : undefined,
     signed: typeof r.signed === "boolean" ? r.signed : method === "shap_tree" || method === "permutation_shapley",
     features: [...groups].map(([name, g]) => ({ name, value: g.value, contribution: g.contribution, assumed: g.assumed })),
@@ -188,6 +197,12 @@ export interface ModelMetrics {
 
 export async function getModelInfo(): Promise<ModelMetrics> {
   const res = DEMO_MODE ? await fetch("/model-info.json") : await request("/model-info");
+  if (!res.ok) return fail(res);
+  return res.json();
+}
+
+export async function getInputDefaults(): Promise<InputValues> {
+  const res = DEMO_MODE ? await fetch("/input-defaults.json") : await request("/input-defaults");
   if (!res.ok) return fail(res);
   return res.json();
 }

@@ -124,3 +124,28 @@ buttons and Reset view. Expanded view uses a modal workspace, locks background
 scrolling, keeps keyboard focus inside and exits with Escape. The opacity setting
 is retained when switching modes; the slider is disabled while Vessel focus is
 opaque. Source mesh registration and prediction semantics are unchanged.
+
+## Dashboard layout
+
+The frontend implements the five-zone layout required by PROBLEM.md §18:
+
+| Zone | Component | Content |
+|---|---|---|
+| Patient features | `fields.ts` form | 54 inputs in 8 collapsible sections |
+| 3D anatomy | `HeartViewer.tsx` | Registered GLB heart + coronary overlays |
+| Risk summary | Risk cards | 4 predictions with probability bars |
+| Model explanation | Explanation panel | Top-8 Shapley contributions chart + full table |
+| Safety disclaimer | Footer banner | Visible research-use-only disclaimer |
+
+The form sits full-width above results. After analysis, the heart panel and
+explanation panel each occupy a full-width row, with the explanation below the
+heart at all screen sizes.
+
+## Dual-view presentation
+
+- **Clinician view**: medical terminology, exact probability values, feature names
+- **Patient view**: plain-language descriptions, simplified risk framing,
+  "what this means for you" explanations
+
+Both views use the same underlying predictions. Only the presentation language
+differs.

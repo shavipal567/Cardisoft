@@ -31,9 +31,11 @@ from sklearn.pipeline import Pipeline
 from xgboost import XGBClassifier
 
 from preprocessing import (TARGETS, build_native_preprocessor,
-                            build_preprocessor, native_cat_indices,
-                            split_features_target)
+                            build_preprocessor, build_voting_preprocessor,
+                            native_cat_indices, split_features_target)
 from stacking import StackedModel
+from voting import (VotingClassifier, build_voting_estimators,
+                    optimize_voting_weights_and_threshold)
 
 RANDOM_STATE = 42
 TEST_SIZE = 0.2
@@ -91,11 +93,16 @@ def make_configs(y_train):
         configs.append({"model": "cat", "prep": "native",
                         "params": dict(zip(CAT_GRID.keys(), v))})
     configs.append({"model": "stack", "prep": "onehot", "params": {}})
+    configs.append({"model": "vote", "prep": "voting", "params": {}})
     return configs, scale_pos
 
 
 def build_prep(prep):
-    return build_native_preprocessor() if prep == "native" else build_preprocessor()
+    if prep == "native":
+        return build_native_preprocessor()
+    if prep == "voting":
+        return build_voting_preprocessor()
+    return build_preprocessor()
 
 
 def build_estimator(kind, params, scale_pos):
@@ -173,9 +180,19 @@ def make_stack_bases(scale_pos):
 
 
 def fit_with_track(kind, params, scale_pos, prep, X_tr, y_tr):
-    """Fit (prep-fitted-on-X_tr, classifier) and return both."""
     pre = build_prep(prep).fit(X_tr)
     Xt = pre.transform(X_tr)
+    if kind == "vote":
+        estimators = build_voting_estimators(scale_pos)
+        best, _ = optimize_voting_weights_and_threshold(
+            estimators, Xt, y_tr.values, cv=5, seed=RANDOM_STATE,
+        )
+        clf = VotingClassifier(
+            estimators,
+            weights=best["weights"],
+            threshold=best["threshold"],
+        ).fit(Xt, y_tr.values)
+        return pre, clf
     if kind == "stack":
         clf = StackedModel(make_stack_bases(scale_pos)).fit(Xt, y_tr.values)
         return pre, clf
@@ -197,7 +214,17 @@ def repeated_cv_scores(cfg, X_train, y_train, scale_pos, seeds):
             y_tr, y_va = y_train.iloc[tr_idx], y_train.iloc[va_idx]
             pre = build_prep(cfg["prep"]).fit(X_tr)
             Xt_tr, Xt_va = pre.transform(X_tr), pre.transform(X_va)
-            if cfg["model"] == "stack":
+            if cfg["model"] == "vote":
+                estimators = build_voting_estimators(scale_pos)
+                best, _ = optimize_voting_weights_and_threshold(
+                    estimators, Xt_tr, y_tr.values, cv=3, seed=seed,
+                )
+                clf = VotingClassifier(
+                    estimators,
+                    weights=best["weights"],
+                    threshold=best["threshold"],
+                ).fit(Xt_tr, y_tr.values)
+            elif cfg["model"] == "stack":
                 clf = StackedModel(make_stack_bases(scale_pos),
                                    random_state=seed).fit(Xt_tr, y_tr.values)
             else:
@@ -338,6 +365,13 @@ def train_target(key, df, repeats):
         "repeats": repeats, "seeds": seeds,
         "git_hash": git_hash,
     }
+    if best["model"] == "vote":
+        meta["threshold"] = float(clf.threshold)
+        meta["voting_weights"] = {
+            name: float(w) for (name, _), w in zip(
+                clf.estimators, clf.weights or [1.0] * len(clf.estimators)
+            )
+        }
     (out_dir / "metadata.json").write_text(json.dumps(meta, indent=2))
     return best
 

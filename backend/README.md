@@ -17,7 +17,8 @@ uvicorn main:app --host 127.0.0.1 --port 8000
 |---|---|
 | `GET /health` | Liveness, artifact availability, targets and disclaimer; always 200 |
 | `GET /model-info` | Saved model names, CV protocol and held-out metrics from the configured artifact directory |
-| `POST /predict` | Validated measurements → `{cad, vessels: {LAD, LCX, RCA}}`; each has `prediction` and `probability` |
+| `GET /input-defaults` | All 54 input defaults using CSV aliases; does not require model artifacts |
+| `POST /predict` | Validated measurements → `{cad, vessels: {LAD, LCX, RCA}, context}`; each estimate has `prediction` and `probability` |
 | `POST /explain` | `{features, target, top_k}` → patient-specific grouped permutation Shapley estimates |
 
 Predict accepts CSV aliases such as `Current Smoker` and `EF-TTE`, or the
@@ -25,6 +26,11 @@ Python field names. Omitted fields receive explicit defaults from `schemas.py`.
 An empty object is valid. Explicit nulls, extra keys (including target labels),
 non-finite values and invalid categories return 422. This intentionally replaces
 the old silent-ignore behavior for unknown keys.
+
+Prediction `context` records `effective_inputs`, `defaulted_inputs`, and model
+identities for the completed assessment. Each model identity includes its name,
+training revision when available, and a SHA-256 `version` fingerprint of the
+loaded preprocessor and model bytes. Explicit zero values count as supplied.
 
 Binary flags require integer 0/1. Sex accepts Male/Female and normalizes the
 legacy dataset spelling Fmale. Y/N fields, BBB and VHD have enumerated values;
@@ -51,6 +57,8 @@ curl -X POST localhost:8000/explain -H 'Content-Type: application/json' \
 - `features`: original clinical names, raw values and signed contributions.
 - `remaining_contribution`: sum of omitted contributions after top-k selection.
 - `background_rows`, `permutations_per_background` and a method/limitations note.
+- `model_version`: the loaded model fingerprint, allowing reports to reject
+  explanations from a different model than the recorded prediction.
 
 `base_value + sum(returned contributions) + remaining_contribution` equals
 `probability` within floating-point tolerance. Contributions are approximate,

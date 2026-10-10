@@ -96,16 +96,22 @@ export function riskColor(p: number) {
   return `rgb(${c.join(",")})`;
 }
 
+export function fieldError(field: Field, value: number | undefined): string {
+  if (value === undefined) return "";
+  if (!Number.isFinite(value)) return "Enter a valid number, or clear the field to use its default.";
+  if (field.type === "toggle" && value !== 0 && value !== 1) return "Choose one of the listed options.";
+  if (field.options && !field.options.some((option) => option.value === value)) return "Choose one of the listed options.";
+  if (field.exclusiveMin && value <= (field.min ?? -Infinity)) return `Enter a value greater than ${field.min}.`;
+  if (value < (field.min ?? -Infinity) || value > (field.max ?? Infinity)) {
+    if (field.min !== undefined && field.max !== undefined) return `Enter a value from ${field.min} to ${field.max}.`;
+    if (field.min !== undefined) return `Enter ${field.min} or greater.`;
+    return `Enter ${field.max} or less.`;
+  }
+  return "";
+}
+
 export function validate(values: Patient): string[] {
-  return FIELDS.filter((f) => {
-    const v = values[f.key];
-    if (v === undefined) return false;
-    if (!Number.isFinite(v)) return true;
-    if (f.type === "toggle") return v !== 0 && v !== 1;
-    if (f.options) return !f.options.some((option) => option.value === v);
-    return v < (f.min ?? -Infinity) || v > (f.max ?? Infinity)
-      || (f.exclusiveMin === true && v === f.min);
-  }).map((f) => f.label);
+  return FIELDS.filter((field) => fieldError(field, values[field.key])).map((field) => field.label);
 }
 
 export function buildPayload(values: Patient): Patient {

@@ -35,6 +35,33 @@ category validation. Names are not included in requests. Category selections
 are translated to the backend's exact values. Units appear beside measurements;
 acceptance limits are not diagnoses.
 
+Each input has an info button that opens a brief explanation and a Google search
+link in a new tab. Searches use fixed topic names from `src/fieldInfo.ts`, never
+patient values. Escape or clicking outside closes the explanation. Model-specific
+function-class and wall-motion codes are described without inventing clinical
+scale mappings.
+
+The form starts with About the patient expanded. Section headers show supplied
+counts and invalid-field counts; Expand/Collapse all controls and a field search
+help navigate all inputs. Search matches names, abbreviations and help topics
+and opens matching sections without changing values. Invalid values display
+inline messages; Analyze clears the search, opens affected sections and focuses
+the first invalid input. Empty fields remain valid and optional.
+
+Field badges distinguish Entered, Imported, Sample and Default values. Editing
+an imported value changes its badge to Entered; clearing it shows the actual
+server default again. Badges describe input source, not clinical reliability.
+
+Results lead with the overall CAD estimate, followed by vessel estimates,
+anatomy, explanations, and report/comparison tools. Mobile users can jump between
+Inputs, Results and Anatomy using the sticky navigation. Prediction, explanation,
+heart loading, PDF import and report preparation each have separate status text.
+
+Start new assessment clears patient inputs, provenance, imported-file details,
+results, explanations and comparison state, while retaining theme/view preferences.
+Late prediction/import responses are ignored after reset, and leaving/resetting
+an assessment cancels its pending report download.
+
 `pdf/extractText.ts` lazily loads pdf.js and extracts selectable text locally
 (up to 20 pages/200,000 characters). `pdf/fieldMap.ts` uses aliases and negation
 heuristics; out-of-range matches are skipped, not clamped. Review extracted
@@ -42,7 +69,7 @@ values before Analyze. Scanned images need manual entry. Imported Sex updates
 both model input and the visible Male/Female selection. A preselected Others
 identity remains selected, with the imported model-sex radio updated.
 
-`api.ts` calls `/predict`, `/explain`, and `/model-info`. Live explanations use
+`api.ts` calls `/predict`, `/explain`, `/input-defaults`, and `/model-info`. Live explanations use
 signed, approximate patient-specific Shapley contributions, grouped by original
 feature. The chart shows the largest eight contributions, including defaulted
 features marked default; the detailed table distinguishes provided values from
@@ -62,9 +89,29 @@ fixtures for explicit demo mode. The obsolete mock metrics file has been removed
 
 ## Verification and limits
 
+The input coverage panel counts supplied and defaulted fields and lists the
+server defaults. Coverage measures completeness, not prediction confidence.
+Demo mode reads the matching `public/input-defaults.json` fixture.
+
+After analyzing, choose **Use as comparison baseline**, change inputs, and
+analyze again. The comparison shows all four estimates, percentage-point
+changes, and changed input values or sources. The baseline stays in browser
+memory across dashboard navigation; reloading clears it.
+
+**Download PDF report** exports the completed assessment, including all 54
+input values and their sources, predictions, model fingerprints, available
+explanations, and the active comparison. Unsubmitted form edits are excluded.
+It also embeds a PNG of the current 3D heart view on a dedicated page, including
+visible labels and the estimate legend. The image is captured at the export
+click, before explanation requests; wait for the heart to load before exporting.
+Missing or mismatched-model explanations are explicitly identified. Demo
+reports are labelled as fixed examples. Reports are generated locally using
+jsPDF; explanation requests send measurements to the configured API.
+
 ```bash
 npm run build
 npm run lint
+npm test
 ```
 
 Manual check: live mode → sample patient → Analyze → edit values → Analyze
@@ -116,3 +163,31 @@ mouse/touch controls; Reset view restores the anterior camera. Expanded view
 locks background scrolling, contains keyboard focus and closes with Escape.
 The artery table and reference/credit notes live in a collapsible details panel.
 The opacity slider remains visible but disabled in the opaque Vessel focus mode.
+
+## Anatomy exploration and image export
+
+- **Isolate selected artery** keeps the selected LAD, LCX or RCA bright and dims
+  the other reference paths and their labels. Selecting another artery transfers
+  the focus. Enabling isolation from the overall CAD estimate locates LAD first.
+- **Anatomy labels** adds the four chamber surface regions, aorta, pulmonary trunk
+  and apex. Labels follow the camera, avoid artery buttons, and use conservative
+  direction-based visibility; the left atrium appears from behind. These are
+  manually registered external landmarks projected onto the mesh, not verified
+  chamber segmentation or a view of chamber interiors. Seeds and tour copy live
+  in `src/anatomy/exploration.ts`. The anatomical orientation is informed by
+  [Cardiac anatomy revisited](https://pmc.ncbi.nlm.nih.gov/articles/PMC1571338/).
+- **Guided tour** moves through five steps covering the anterior overview, LAD,
+  lateral LCX, posterior surface, and right-sided RCA. Next/Back changes presets
+  and selection; Finish/End restores the pre-tour display settings and preset.
+  Manual camera or artery selection exits the tour at the current view.
+- **Export PNG** downloads the current rendered view with visible artery and
+  anatomy labels, orientation, estimates, colour legend, display mode and asset
+  credit. It works in expanded view and on mobile. The WebGL frame is rendered
+  and copied synchronously, then DOM callouts are composited at twice the display
+  resolution; no continuous drawing-buffer preservation or server upload is
+  required. A browser error is shown if rendering or encoding fails.
+
+Manual check: select each artery with isolation on; toggle anatomy labels;
+inspect front/back/side views; run the tour forward/backward and finish; export
+both a labelled view and a view with overlays hidden. Check exported labels,
+legend and clipping on desktop/mobile and in expanded view.
