@@ -1,13 +1,12 @@
 # Feature engineering
 
-## v1 (shipped): minimal, faithful
+## Current implementation: minimal, faithful
 
-v1 deliberately engineers **no derived features**. Rationale: on 303 rows,
-every engineered feature is another overfitting degree of freedom, and the
-baseline had to establish honest CV/test numbers first (CAD AUC 0.877, LAD
-0.839, LCX 0.693, RCA 0.735). The 54 raw inputs → 81 transformed features carry
-the full signal; the only "engineering" is type-level (RWMA → categorical,
-`Fmale` fix).
+The current pipeline engineers no derived features. It uses 54 clinical inputs,
+transformed into 54 native columns for CAD or 81 one-hot columns for vessels.
+The cleaning changes are the Fmale spelling correction and categorical treatment
+of Region RWMA. Current test AUC is CAD .893, LAD .843, LCX .711, RCA .748;
+feature experiments must be judged on repeated CV, not these test scores.
 
 ## Backlog (from `training/IMPROVEMENTS.md`, each judged by repeated-CV delta)
 

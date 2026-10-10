@@ -23,8 +23,8 @@ modality C (e.g. echo imaging) ─┘
    `build_preprocessor()` (e.g. `build_ecg_preprocessor()`), returning a fixed
    vector per patient. Tabular branch untouched.
 2. **Fusion operator** (in order of complexity): late fusion (concatenate
-   modality vectors → current RF/XGB heads — no API change); score-level fusion
-   (per-modality heads → meta-learner, mirrors the planned stacking in
+   modality vectors → a candidate prediction head — no API change); score-level fusion
+   (per-modality heads → meta-learner, mirrors the evaluated stacking track in
    IMPROVEMENTS.md); joint training only if data scale justifies it.
 3. **Inference contract**: `predict_patient()` gains optional modality keys;
    missing modalities fall back to tabular-only via the existing imputation

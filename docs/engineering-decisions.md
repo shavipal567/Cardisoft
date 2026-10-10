@@ -1,57 +1,59 @@
-# Engineering decisions (ADRs)
+# Engineering decisions
 
-Short records of why the repo looks the way it does. Newest last.
+## Separate training and serving
 
-## ADR-1: `training/` owns all ML, `backend/` only serves
+`training/` owns fitting and frozen inference; `backend/` validates requests
+and serves those artifacts. Shared transformation code reduces drift, while
+API defaults remain distinct from fitted imputation. Run the backend from its
+own directory; services bootstrap the sibling training directory on sys.path.
 
-`training/` holds preprocessing, training, evaluation, inference helper, and
-frozen artifacts; `backend/` imports `training/inference.py` by path and never
-fits anything. Consequence: one implementation of cleaning/transform/threshold
-— train-serve skew is structurally impossible. Cost: the `sys.path` bootstrap
-in `services/*.py` and no `backend/__init__.py` (run uvicorn from `backend/`).
+## Four independent models
 
-## ADR-2: Four independent heads in v1
+The saved v2 winners are CatBoost-native for CAD and Random Forest for all
+vessels, selected among six families and 31 configurations per target using
+10×5-fold CV. Classifier chains and calibration are future work.
 
-One classifier per target with identical protocol, instead of multi-output or
-chains. Reason: establishes honest baselines first on 303 rows; vessel
-dependence (measured: any-stenotic ⇒ CAD at 0.994–1.0, strong co-occurrence) is
-backlogged as chains/multi-task rather than assumed. CAD-as-OR ensemble is a
-planned experiment, not the default.
+## Two preprocessing tracks
 
-## ADR-3: Shared preprocessor, RobustScaler, no v1 feature engineering
+One-hot encoding yields 81 saved vessel inputs. Native categorical encoding
+yields 54 CAD inputs; CatBoostNative preserves integer categorical types.
+Both exclude all four target labels and fit transformations on training data.
 
-One `ColumnTransformer` (median+RobustScaler / most-frequent+one-hot, 81
-outputs) for all heads — correct for future linear models, harmless for trees.
-No derived features in v1: baselines before degrees of freedom. Skewed-lab
-log-transforms, ratios, and counts are backlogged behind repeated-CV gates.
+## Reproducible local artifacts
 
-## ADR-4: Pinned `==` dependencies in both `requirements.txt` files
+Version-pinned ML dependencies and committed model/preprocessor/background/
+metadata files let the demo run without retraining. ARTIFACTS_DIR supports
+alternate bundles. Restart the API after replacing cached artifacts.
 
-`joblib` artifacts only unpickle under matching sklearn/xgboost versions, so
-both files pin the exact verified set. `shap` stays optional/commented until a
-compatible `shap`/`numba`/`coverage` trio is confirmed (current env breaks on
-import; the explainer's labeled fallback covers it).
+## Live by default, explicit demo mode
 
-## ADR-5: Artifacts tracked in git (~7.9M)
+Frontend API calls default to `/api`; Vite proxies to port 8000. Only an explicit
+VITE_USE_MOCK=true enables labelled static fixtures. Prediction failures do not
+silently switch modes. Production needs its own API routing configuration.
 
-`training/artifacts/*.joblib` are committed (see `.gitignore` note) so the
-backend runs without a training step or model registry — appropriate for a
-hackathon prototype, to be revisited (registry/S3 + `ARTIFACTS_DIR`) if this
-outgrows a demo.
+## Metadata from the deployed artifacts
 
-## ADR-6: No frontend in scope; contract-first visualization doc
+`/model-info` reads metrics and metadata beside the configured models. The demo
+snapshot is exported by the same `training/model_info.py` function. Legacy mock
+metrics are no longer a UI data source.
 
-3D/dashboard deferred, but the API already serves exactly what the future
-frontend needs (`/predict` probabilities, per-head `/explain`, disclaimer via
-`/health`), and `visualization.md` pins the mapping and §15 non-localization
-constraint so the UI can't misrepresent the science later.
+## Patient-specific explanations without a fragile optional runtime
 
-Update: the frontend has since been built (`frontend/` — form, PDF scanner,
-risk cards, explanations, schematic `HeartViewer` with heartbeat, safety
-copy). The contract above held: no API change was needed.
+The old SHAP import/global-importance fallback was replaced by seeded grouped
+permutation Shapley estimates using model probabilities. All models share
+probability units; one-hot categories move as complete groups. The method is
+explicitly approximate, has an additive residual for top-k outputs, and exposes
+failures. No shap/numba/coverage dependency is needed.
 
-## ADR-7: Honest metrics over tuned metrics
+## Explicit validation and input provenance
 
-Weak LCX/RCA numbers ship as-is; no SMOTE, no test-peeking, no selectively
-reported splits. `IMPROVEMENTS.md` names the ceiling (~0.80 without more data)
-instead of engineering around it.
+Omitted API fields retain defaults; invalid supplied values and unknown keys
+are rejected. The form still collects 19/54 features, so uncollected values are
+identified in explanations. PDF imports update both the model-sex input and
+visible selection, while preserving an explicit Others identity.
+
+## Schematic visualization and honest reporting
+
+The React dashboard and procedural 3D heart are implemented. Vessel coloring
+communicates named-vessel model estimates, not lesion coordinates. LCX/RCA
+limitations, uncalibrated probabilities and the research disclaimer remain visible.

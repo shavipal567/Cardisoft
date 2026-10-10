@@ -1,94 +1,106 @@
-# Frontend — Cardisoft clinical dashboard
+# Frontend — Cardisoft dashboard
 
-React 19 + TypeScript + Vite + Three.js (R3F) + Recharts. Patient form,
-ML predictions, SHAP-style explanations, and an interactive schematic 3D
-heart with vessel-level risk mapping (PROBLEM.md §§12–18). Talks to
-`backend/` over REST/JSON, or runs fully offline on static mocks.
+React + TypeScript + Vite, Recharts, and React Three Fiber. The dashboard
+collects patient measurements, imports text PDFs, requests four predictions,
+and links the selected vessel to its explanation and schematic 3D heart.
+Clinician and patient views use different presentation language.
 
-Related docs: `../PROBLEM.md`, `../docs/visualization.md` (3D contract),
-`../backend/README.md` (API), `../docs/explainability.md`.
+## Run
 
-## 1. Layout
-
-```text
-frontend/
-├── src/
-│   ├── App.tsx               # patient form + risk cards + explanation + dashboard wiring
-│   ├── api.ts                # predict()/explain() + response normalization + mock toggle
-│   ├── fields.ts             # 19 form fields (keys match backend CSV aliases), SAMPLE patient
-│   ├── pdf/
-│   │   ├── extractText.ts    # client-only pdf.js text extraction (lazy chunk)
-│   │   └── fieldMap.ts       # deterministic alias-regex parser → 19 fields + confidence
-│   ├── components/
-│   │   ├── HeartViewer.tsx   # procedural schematic heart + LAD/LCX/RCA tubes (R3F)
-│   │   └── Logo.tsx
-│   ├── App.css / index.css   # theme (light/dark), cards, canvas, HUD, spec-table styles
-│   └── main.tsx
-├── public/
-│   ├── mock_predict.json / mock_explain.json  # offline demo responses (§23 examples)
-│   ├── sample-lab-report.pdf (+ make_sample_report.py)  # dummy report for the PDF scanner
-│   └── wallpapers, icons, heart.png
-├── .env                      # VITE_USE_MOCK / VITE_API_URL (tracked; dev defaults)
-└── package.json              # react@19, three@0.186, @react-three/{fiber@9,drei@10},
-                              # recharts@3, pdfjs-dist@6, vite@8, typescript@6, oxlint
-```
-
-## 2. Features
-
-- **Patient form (19 fields)** — 9 numbers (Age, BMI, BP, PR, FBS, LDL, HDL,
-  TG, EF-TTE) + 10 toggles (Sex, DM, HTN, smoker, FH, chest pain, ECG flags),
-  grouped, validated against `FIELDS.min/max`. Missing backend fields fall back
-  to server defaults/imputation. `Load sample patient` fills the demo case.
-- **📄 Scan lab PDF** — text-based lab PDFs are parsed **in the browser**
-  (pdf.js lazy chunk + worker; no upload). `fieldMap.ts` maps aliases
-  (e.g. `LDL-C`, `Fasting Blood Sugar`, `EF`) with range clamping, negation
-  handling (`no/not/absent/...`), DOB→age fallback, and per-field
-  high/medium confidence + skipped reasons. Values merge into the form for
-  review — Analyze is always manual. Scanned-image PDFs get a clean error.
-  Try it with `public/sample-lab-report.pdf` (all 19 fields parse).
-- **Risk cards** — CAD/LAD/LCX/RCA probabilities with animated %, meter,
-  Positive/Negative pill, and a low-validation-performance note on LCX/RCA.
-- **HeartViewer (3D)** — procedural schematic heart (ellipsoid + apex pinch,
-  aorta stub) with three clickable `TubeGeometry` vessels. Deterministic
-  `P(vessel) → mesh` color + numeric labels, vessel spec table, legend,
-  orientation annotations, gentle lub-dub pulse (off under
-  `prefers-reduced-motion`). Rendered **only after Analyze**. Schematic
-  context only — never lesion localization (§15 copy in-app).
-- **Explanations** — per-target (`CAD/LAD/LCX/RCA`) top-8 contribution bar
-  chart + patient-value × contribution table, with base value and
-  non-causality wording.
-- **Safety** — emergency banner (India 112/108) + Clinical Safety Notice on
-  every screen.
-
-## 3. Configuration
-
-| var | default | meaning |
-|---|---|---|
-| `VITE_API_URL` | `http://localhost:8000` | FastAPI base URL |
-| `VITE_USE_MOCK` | `true` | anything but `"false"` → use `public/mock_*.json` instead of the backend |
-
-Mock mode needs no backend; set `VITE_USE_MOCK=false` for live inference.
-
-## 4. Run & verify
+Start the backend on port 8000 (see `../README.md`), then:
 
 ```bash
-npm install
-npm run dev      # vite, http://localhost:5173
-npm run lint     # oxlint
-npm run build    # tsc -b && vite build
+npm ci
+npm run dev
 ```
 
-Manual pass: Load sample (or scan `sample-lab-report.pdf`) → Analyze →
-4 risk cards → 3D vessels recolor with `%` labels → click LAD/LCX/RCA →
-explanation + table update per vessel → disclaimer visible. Repeat in dark
-mode and at mobile width (layout stacks).
+| Setting | Default | Meaning |
+|---|---|---|
+| `VITE_USE_MOCK` | false | Only the literal `true` enables fixed offline fixtures |
+| `VITE_API_URL` | /api | API base; Vite proxies this prefix to localhost:8000 during development |
 
-## 5. Notes & limits
+See `.env.example`. Restart Vite after environment changes. A mode banner is
+always visible; demo mode says its outputs do not respond to changed inputs.
+Failed live requests show errors, never substitute fixtures. Production hosting
+must proxy `/api` to FastAPI or configure an API origin at build time; `vite
+preview` has no development proxy.
 
-- Form covers 19/54 backend fields; the rest use server defaults (marked
-  `assumed` in `api.ts` normalization).
-- 3D bundle is ~1.5MB (Three.js, direct import); pdf.js is code-split into
-  its own lazy chunk. Code-split the viewer too if initial load matters.
-- Explanations show aggregated one-hot contributions mapped back to form
-  fields; live backend currently serves `gain_importance_fallback`
-  (ranking, not additive SHAP) until the `shap` trio is pinned.
+## Data and display
+
+`fields.ts` defines all 54 model inputs, grouped into eight sections. Every
+field is optional; blank numeric inputs and “Not provided” selections are
+omitted from requests and receive explicit server defaults. No/absent is an
+explicit choice, distinct from missing. Supplied values must pass numeric or
+category validation. Names are not included in requests. Category selections
+are translated to the backend's exact values. Units appear beside measurements;
+acceptance limits are not diagnoses.
+
+`pdf/extractText.ts` lazily loads pdf.js and extracts selectable text locally
+(up to 20 pages/200,000 characters). `pdf/fieldMap.ts` uses aliases and negation
+heuristics; out-of-range matches are skipped, not clamped. Review extracted
+values before Analyze. Scanned images need manual entry. Imported Sex updates
+both model input and the visible Male/Female selection. A preselected Others
+identity remains selected, with the imported model-sex radio updated.
+
+`api.ts` calls `/predict`, `/explain`, and `/model-info`. Live explanations use
+signed, approximate patient-specific Shapley contributions, grouped by original
+feature. The chart shows the largest eight contributions, including defaulted
+features marked default; the detailed table distinguishes provided values from
+server defaults for all 54 inputs.
+Errors appear in both clinician and patient views.
+
+`ModelInfo.tsx` uses live saved-artifact metadata. Offline demo mode uses
+`public/model-info.json`, an explicitly labelled saved-evaluation snapshot:
+
+```bash
+# From repository root, after training and evaluation:
+python training/model_info.py --output frontend/public/model-info.json
+```
+
+`public/mock_predict.json` and `public/mock_explain.json` remain illustrative
+fixtures for explicit demo mode. The obsolete mock metrics file has been removed.
+
+## Verification and limits
+
+```bash
+npm run build
+npm run lint
+```
+
+Manual check: live mode → sample patient → Analyze → edit values → Analyze
+again → verify changed probabilities → select all vessels → check signed
+explanations → open Model Info. Import a report with the opposite sex and check
+both the displayed selection and submitted value. Repeat on mobile/dark mode.
+
+The 3D viewer uses the existing `public/heart.glb` asset, registered so +X is
+patient left, +Y superior and +Z anterior. Surface-fitted artery paths replace
+the old ellipsoid overlays: LAD follows the anterior interventricular groove;
+LCX and RCA follow the left/right AV grooves toward the posterior heart. LAD
+and LCX share a left-main origin. Small branches and variants are omitted.
+Anterior, posterior and both lateral camera presets accompany rotation/zoom
+and accessible artery selection. Hidden labels are occluded by the heart.
+Rendering runs on demand; surface raycasting occurs offline. The default display
+shows all three coronary reference highlights and positional labels on a muted
+heart surface. Original colours restores the textured appearance; the highlights
+checkbox can hide the overlays. Locate buttons select each artery and orient the
+camera (left lateral for LCX, anterior for LAD/RCA). The current GLB
+has 14 generic mesh chunks sharing one material, with no vessel segmentation or
+anatomical names. It cannot establish native LAD/LCX/RCA identity by itself.
+
+“Show LAD, LCX and RCA highlights” controls the separately
+constructed paths and their labels, enabled by default. These are illustrations, not native-vessel
+identifications. In that mode, Vessel focus mutes the heart to make the outlined
+routes easier to follow; Original colours restores the asset's materials.
+Overlay colours are unlit so they match the risk legend; a white outline
+identifies the selected artery. Depth testing still hides posterior segments.
+The source asset and cached artery paths are unchanged by these display modes.
+
+`npm run anatomy:register` regenerates `src/anatomy/heart-coronaries.json` from
+`src/anatomy/registration.ts` and the GLB. `npm run anatomy:check` checks asset
+and landmark fingerprints, surface contact, continuity and route direction.
+Regenerate after replacing the asset or changing its registered landmarks.
+
+The asset metadata credits Pigcraft under CC BY 4.0; attribution and the
+anatomical reference appear in the viewer. The registration is illustrative,
+not clinically validated or patient-specific, and does not locate lesions.
+Its direct import still makes the initial JavaScript bundle large.

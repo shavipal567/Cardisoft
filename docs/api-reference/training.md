@@ -11,3 +11,5 @@ Rendered from docstrings in `training/`. Prose documentation:
 ::: training.evaluate
 
 ::: training.inference
+
+::: training.model_info

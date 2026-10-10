@@ -1,45 +1,47 @@
 # Explainability
 
-Requirement: patient-specific, per-head feature attribution that reads as model
-behavior, never clinical causality (PROBLEM.md §§19–21). Code:
-`backend/services/explainer.py`, served at `POST /explain`.
+`backend/services/explainer.py` computes **approximate patient-specific grouped
+permutation Shapley values**, served by `/explain`. All four targets use the
+same algorithm and their own frozen model/preprocessor/background.
 
-## Design: SHAP first, labeled fallback
+## Algorithm
 
-1. **Primary — SHAP TreeExplainer** (exact for RF/XGBoost): per-patient SHAP
-   values over the 81 transformed features against the 100-row background in
-   `artifacts/<head>/shap_background.npz`. Contributions are additive
-   (sum to `probability − base_value`); `base_value` = expected value over
-   background.
-2. **Fallback — normalized gain importance**: if the `shap`/`numba` stack fails
-   to import (observed in this env: `numba` vs `coverage` conflict), the
-   endpoint stays up and returns `feature_importances_` weights with
-   `method: "gain_importance_fallback"`. These sum to 1 and are a **ranking**,
-   not additive attribution — the response says so. Permitted by §19
-   ("model-specific feature importance … or other defensible method").
+1. Select 16 reproducible reference rows from each target's 100-row saved
+   training background, using seed 42.
+2. Group transformed columns by original input, including entire one-hot
+   blocks. Never replace part of a categorical encoding on its own.
+3. For each reference, sample four feature orders and their reverses. Walk
+   from reference to patient by replacing one feature group at a time.
+4. Evaluate the model's positive-class probability for every step in a batch.
+5. Average marginal probability changes over all paths for each feature.
 
-The `method` field always declares which you received. The `note` field always
-carries the non-causality wording.
+This follows the permutation-attribution approach described in the
+[SHAP permutation explainer documentation](https://shap.readthedocs.io/en/stable/generated/shap.PermutationExplainer.html).
+Our implementation uses NumPy and `predict_proba` directly, so it works with
+CatBoostNative as well as Random Forest without the broken SHAP/numba import path.
+It is an approximation, not exact TreeSHAP. Finite sampling affects attribution
+precision; correlated-feature combinations need not represent realistic patients.
 
-## Response fields
+## Interpretation and response
 
-| Field | Meaning |
-|---|---|
-| `target` | `CAD/LAD/LCX/RCA` (request accepts lowercase) |
-| `base_value` | SHAP: background expected value; fallback: train pos rate (CAD 0.7149) |
-| `probability` | current head's predicted probability for this patient |
-| `method` | `shap_tree` or `gain_importance_fallback` |
-| `features[]` | top-k by \|contribution\|: `{name, value, contribution}` (+ `raw_value` in fallback) |
-| `note` | model-behavior disclaimer + SHAP error class if fallback |
+`method` is `permutation_shapley`; `signed` and `approximate` are true;
+`output_space` is probability. The base value is the mean prediction over the
+selected reference rows. Positive contributions raise the model estimate;
+negative contributions lower it. Contributions are in probability units
+(0.01 means one percentage point), not log odds or feature-importance weights.
 
-Feature `name`s are post-transform (`num__Age`, `cat__Sex_Male`, …); `value` is
-the transformed coordinate, so pair it with the patient summary for human
-reading (the planned physiological breakdown table: measurement | patient value
-| contribution).
+Complete paths telescope, so:
 
-## Language rules (enforced in copy, review in PRs)
+```text
+base_value + sum(features[].contribution) + remaining_contribution = probability
+```
 
-- Say: "RWMA had a positive contribution to this model prediction."
-- Never: "RWMA caused the patient's CAD."
-- Never present contributions as diagnosis, lesion evidence, or validated risk
-  drivers.
+The residual accounts for top-k truncation. At top_k=60 all 54 original features
+are returned and the residual is zero. The chart displays only eight of those.
+Raw feature values accompany contributions; uncollected fields use server defaults.
+This explains the completed model input, not exclusively measured patient values.
+
+Failures are surfaced as errors, not silently replaced by global importance.
+Regression tests check additivity, known linear attributions, grouped categoricals,
+repeatability, patient dependence and agreement with `/predict` for all four models.
+Explanations describe model behavior, never medical causality or lesion location.

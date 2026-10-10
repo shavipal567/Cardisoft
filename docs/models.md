@@ -1,66 +1,35 @@
 # Models
 
-Code: `training/train.py`. Four independent binary heads (one per target),
-shared preprocessing, shared protocol.
+Source: `training/train.py`, with frozen selections in each target's
+`training/artifacts/<target>/metadata.json`.
 
-## Protocol (identical for cad/lad/lcx/rca)
+## Current protocol
 
-- Stratified 80/20 split, `random_state=42` → 242 train / 61 test.
-- Stratified 5-fold CV on train; preprocessor fitted **inside each fold** via
-  `Pipeline(prep → clf)`.
-- 16 configs × 5 folds = 80 fits per head, 320 total (CPU-minutes).
-- Selection: highest mean CV ROC-AUC, tie-break mean CV F1. Winner refit on
-  full train; test split never touched until `evaluate.py`.
+Each of CAD, LAD, LCX and RCA has an independent stratified 80/20 split with
+seed 42: 242 train and 61 test patients. Selection uses 10 repeats of 5-fold
+CV on the training partition (seeds 42–51), with a preprocessor fitted inside
+each outer fold. Mean ROC-AUC selects the winner; mean F1 breaks ties.
+PR-AUC and Brier scores are also recorded. Test data does not enter selection.
 
-## Search space
+31 configurations per target: 8 Random Forest, 8 XGBoost, 4 HistGradientBoosting,
+6 LightGBM, 4 CatBoost, and 1 RF/XGB/HGB stack with a logistic-regression meta-model.
+RF/XGB/HGB/stack use one-hot preprocessing; LightGBM/CatBoost use native categorical codes.
+The stack's inner OOF predictions operate on data transformed at the outer-fold
+level; fitting preprocessing again inside each inner fold remains an improvement.
+The stack did not win any target.
 
-| Family | Configs | Settings |
-|---|---|---|
-| RandomForest (`class_weight="balanced"`) | 8 | `n_estimators ∈ {200,400}`, `max_depth ∈ {8,None}`, `min_samples_leaf ∈ {1,2}` |
-| XGBoost (`tree_method="hist"`, `subsample=colsample=0.8`, `reg_lambda=1.0`) | 8 | `n_estimators ∈ {200,400}`, `max_depth ∈ {3,4}`, `learning_rate ∈ {0.05,0.1}`, `scale_pos_weight` from train balance |
+| Target | Saved winner | CV ROC-AUC | Test ROC-AUC |
+|---|---|---:|---:|
+| CAD | CatBoost, depth 4, learning rate .05, L2 3 | .9273 | .8928 |
+| LAD | RF, 400 trees, unlimited depth, leaf minimum 2 | .8428 | .8433 |
+| LCX | RF, 400 trees, unlimited depth, leaf minimum 2 | .7400 | .7106 |
+| RCA | RF, 400 trees, depth 8, leaf minimum 2 | .7067 | .7483 |
 
-XGBoost is explicitly allowed (PROBLEM.md §8); it was fairly compared and lost
-on CV AUC for all four heads in this run.
+Artifacts contain a preprocessor, model, 100-row transformed training background,
+and metadata. CAD transforms into 54 columns; the saved vessel preprocessors
+produce 81 columns. CatBoostNative casts categorical codes to integer columns
+at fit and prediction. Model inference is shared by the backend.
 
-## Winners v2 (10 repeats × 5 folds; full tables in `artifacts/<target>/metadata.json`)
-
-| Head | Winner | Mean CV AUC | Mean CV F1 | Stability Jaccard | Artifact size |
-|---|---|---|---|---|---|
-| cad | CatBoost native, depth 4 / lr 0.05 / l2 3 | 0.9273±0.030 | 0.9074 | 0.85 | — |
-| lad | RF 400/None/leaf2 | 0.8428±0.058 | 0.8181 | 0.83 | — |
-| lcx | RF 400/None/leaf2 | 0.7400±0.060 | 0.5103 | 0.66 | — |
-| rca | RF 400/8/leaf2 | 0.7067±0.068 | 0.4377 | 0.77 | — |
-
-Notes: v1 (single 5-fold) winners were all RF (CAD 0.9272 / LAD 0.8385 /
-LCX 0.7279 / RCA 0.7343). Under 10 repeats, CatBoost-native takes CAD,
-RF holds elsewhere with shifted configs; notably v1's RCA pick (0.7343)
-was seed luck — its honest mean is 0.7067. LightGBM-native, HistGBM and
-the LogReg stack were fairly compared and lost on every head (see
-`artifacts/experiments.csv`). Native track: integer-coded categoricals
-(`build_native_preprocessor`); one-hot track unchanged.
-
-## Winners v1 (superseded, single 5-fold CV)
-
-| Head | Winner | Mean CV AUC | Mean CV F1 | Artifact size |
-|---|---|---|---|---|
-| cad | RF 200/None/leaf1 | 0.9272 | 0.9157 | ~1.3M |
-| lad | RF 400/8/leaf2 | 0.8385 | 0.8089 | ~2.2M |
-| lcx | RF 400/None/leaf1 | 0.7279 | 0.4550 | ~3.3M |
-| rca | RF 200/8/leaf2 | 0.7343 | 0.4659 | ~1.2M |
-
-## Artifacts (`training/artifacts/<head>/`)
-
-- `preprocessor.joblib` — fitted transformer (train-only fit).
-- `model.joblib` — fitted classifier (all RF in v1).
-- `shap_background.npz` — 100 transformed train rows (seeded) for TreeSHAP.
-- `metadata.json` — column/positive label, split sizes, pos rates, winning
-  config, **all 16 CV results**, seed, git hash.
-
-Tracked in git (~7.9M total) because `backend/` loads them at startup.
-`ARTIFACTS_DIR` env var overrides the location.
-
-## Next candidates
-
-LightGBM (native categoricals), CatBoost (ordered boosting, strong at n<1k),
-HistGBM baseline, RF+XGB+LGBM+CatBoost stacking, classifier chains over
-vessel co-occurrence, CAD-as-OR ensemble — see `training/IMPROVEMENTS.md`.
+Current limits: uncalibrated probabilities, a small single-source dataset,
+weak LCX/RCA recall and no external validation. Calibration, derived-feature
+ablations and vessel-dependence models remain experiments, not shipped features.
