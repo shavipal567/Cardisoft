@@ -158,9 +158,24 @@ export default function App() {
     ? [...expl.features]
         .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
         .slice(0, 8)
-        .map((f) => ({ ...f, label: f.assumed ? `${f.name} (typical)` : f.name }))
+        .map((f) => ({
+  ...f,
+  label: f.assumed ? `${f.name} (auto-supplied)` : f.name,
+}))
     : [];
   const selected = predOf(target);
+  const requiredFields = FIELDS.filter(
+  (f) => f.type === "number" || f.key === "Sex"
+);
+
+const completedRequired = requiredFields.filter(
+  (f) => values[f.key] !== undefined && !Number.isNaN(values[f.key])
+).length;
+
+const requiredTotal = requiredFields.length;
+const completionPercent = Math.round(
+  (completedRequired / requiredTotal) * 100
+);
   const axis = dark ? "#93a7bd" : "#7b8da1";
 
   return (
@@ -222,6 +237,38 @@ export default function App() {
             <button className="btn soft" onClick={loadSample}>
               Load sample patient
             </button>
+            <div className="completion">
+  <div className="completion-heading">
+    <span>Required inputs recorded</span>
+    <b>{completedRequired}/{requiredTotal}</b>
+  </div>
+
+  <div
+    className="completion-track"
+    role="progressbar"
+    aria-label="Required inputs recorded"
+    aria-valuenow={completedRequired}
+    aria-valuemin={0}
+    aria-valuemax={requiredTotal}
+  >
+    <span style={{ width: `${completionPercent}%` }} />
+  </div>
+
+  
+<p className="note">
+  {!expl
+    ? "Explanation is not available yet."
+    : expl.signed === false
+      ? expl.note ??
+        "These bars show how much the model relies on each input, not whether it raises or lowers the estimate."
+      : `Base value ${expl.base_value.toFixed(2)}. Rose bars pushed this model output up, blue bars pushed it down. This describes the model's behaviour, not a medical cause.`}
+  {" "}
+  Features labelled "(auto-supplied)" were not collected through this form.
+  Their values were supplied or represented automatically for the model;
+  they should not be treated as patient-confirmed measurements.
+</p>
+
+</div>
 
             <div className="group">
               <label className="field">
@@ -460,7 +507,7 @@ export default function App() {
                       <thead>
                         <tr>
                           <th>Measurement</th>
-                          <th>Patient value</th>
+                          <th>Value used</th>
                           <th>Model contribution</th>
                         </tr>
                       </thead>
@@ -482,7 +529,16 @@ export default function App() {
                           return (
                             <tr key={f.key}>
                               <td>{f.label}</td>
-                              <td>{shown}</td>
+                              <td>
+  {shown}
+  {expl?.features.some(
+    (x) => x.name === f.key && x.assumed
+  ) && (
+    <span title="This feature was supplied automatically rather than collected through the form">
+      {" "}(auto-supplied)
+    </span>
+  )}
+</td>
                               <td className={cls}>{label}</td>
                             </tr>
                           );
