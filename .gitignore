@@ -24,5 +24,11 @@ ENV/
 *.pem
 *.key
 
+# Docs build output (regenerate with: mkdocs build --strict)
+site/
+
+# Training run logs (reproducible via train.py; see artifacts/experiments.csv)
+training/logs/
+
 # NOTE: training/artifacts/*.joblib are intentionally TRACKED —
 # backend/ loads them at startup. Do not ignore them here.

@@ -1,0 +1,12 @@
+# Docs build dependencies (MkDocs site in docs/).
+# Install: pip install -r docs/requirements-docs.txt
+# Build:   mkdocs build --strict
+# Serve:   mkdocs serve
+mkdocs==1.6.1
+mkdocs-material==9.7.7
+mkdocstrings==1.0.6
+mkdocstrings-python==2.0.9
+pymdown-extensions==12.1
+# NOTE: mkdocstrings imports training/* and backend/* modules to render
+# docstrings, so training/requirements.txt and backend/requirements.txt must
+# also be installed in the docs build environment.

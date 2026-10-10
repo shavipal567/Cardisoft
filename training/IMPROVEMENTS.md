@@ -3,13 +3,32 @@
 Objective: maximize ROC-AUC (per scope decision). New dependencies allowed:
 LightGBM, CatBoost. Frontend out of scope.
 
+## v2 status (done — 10 repeats × 5 folds, seeds 42–51)
+
+Winners by mean CV AUC (tie-break F1); test on locked 61-row split:
+
+| target | winner | CV AUC | test AUC | v1 test AUC | stability |
+|---|---|---|---|---|---|
+| cad | CatBoost native d4/lr.05/l2=3 | 0.9273±0.030 | 0.893 | 0.877 | 0.85 |
+| lad | RF 400/None/leaf2 | 0.8428±0.058 | 0.843 | 0.839 | 0.83 |
+| lcx | RF 400/None/leaf2 | 0.7400±0.060 | 0.711 | 0.693 | 0.66 |
+| rca | RF 400/8/leaf2 | 0.7067±0.068 | 0.748 | 0.735 | 0.77 |
+
+Takeaways: CatBoost-native takes CAD; RF holds the vessels (LGBM-native,
+HistGBM, LogReg stack fairly compared, lost everywhere —
+`artifacts/experiments.csv`). v1's RCA pick (single-CV 0.7343) was seed
+luck; honest mean 0.7067. LCX recall 0.333→0.458. Done below: §2
+(repeated-CV harness, PR-AUC/Brier, experiments.csv, stability check) and
+§4 candidates. Remaining: §3 chains/CAD-as-OR, §5 features, §6 calibration.
+
 Full per-config CV numbers live in `training/artifacts/<target>/metadata.json`
-(`all_cv_results`: 16 configs × 5 folds per target). This file records winners,
+(`all_cv_results`: 31 configs × 10 repeats × 5 folds per target). This file records winners,
 deltas, and next steps only.
 
-## 1. Where we stand
+## 1. Historical v1 baseline (superseded by v2 above)
 
-Held-out test (61 rows, seed 42), from `artifacts/metrics.json`:
+Historical held-out test (61 rows, seed 42). Current `artifacts/metrics.json`
+contains the v2 results, not these historical scores:
 
 | target | acc | prec | rec | F1 | ROC-AUC | TN/FP/FN/TP |
 |---|---|---|---|---|---|---|
@@ -38,18 +57,19 @@ Grounding facts (measured on `dataset/dataset.csv`, n=303):
 - 61-row test set ⇒ roughly ±0.06 AUC noise. Deltas below that are seed luck
   without repeated CV.
 
-## 2. Validation first (do before any model change)
+## 2. Validation harness (implemented)
 
-- [ ] Repeated stratified 5-fold CV (×5–10 repeats) in `train.py`; report mean
+- [x] Repeated stratified 5-fold CV (×5–10 repeats) in `train.py`; report mean
       ± std of ROC-AUC per config. Keep the locked 80/20 test split untouched;
       select on CV only.
-- [ ] Log PR-AUC + Brier score alongside ROC-AUC/F1 in CV results and
+- [x] Log PR-AUC + Brier score alongside ROC-AUC/F1 in CV results and
       `metadata.json` (ROC-AUC selects; PR-AUC exposes LCX/RCA ranking quality
       under ~38% prevalence).
-- [ ] Append every run to `artifacts/experiments.csv` (config, CV
+- [x] Append every run to `artifacts/experiments.csv` (config, CV
       AUC/PR-AUC/Brier, seed). Test AUC computed once, at the end.
-- [ ] SHAP-stability check: top-10 features must substantially overlap across
-      CV repeats, else the model is memorizing folds.
+- [x] Gain-importance stability: top-10 overlap across model seeds is recorded.
+      This is not a patient-specific SHAP stability check and does not by itself
+      establish whether a model is overfitting.
 
 ## 3. Vessel-dependence modeling (biggest structural headroom)
 
@@ -64,18 +84,17 @@ Grounding facts (measured on `dataset/dataset.csv`, n=303):
       derived score may win.
 - [ ] `inference.py` / backend schema unchanged (still 4 probabilities).
 
-## 4. New candidates (LightGBM + CatBoost + stacking)
+## 4. Evaluated candidates (implemented)
 
-- [ ] LightGBM with native categoricals (pass Sex/BBB/VHD/Region RWMA + Y/N
+- [x] LightGBM with native categoricals (pass Sex/BBB/VHD/Region RWMA + Y/N
       flags as categorical, skip one-hot on its path).
-- [ ] CatBoost (ordered boosting, strong on n<1k, raw categories).
-- [ ] HistGradientBoosting as sklearn-native baseline.
-- [ ] Regularized small grids: `num_leaves ∈ {7, 15, 31}`,
-      `min_data_in_leaf ∈ {10, 20, 30}`, `lambda_l2`, feature/bagging fraction
-      ~0.8. Shallow + high leaf minimum is the anti-overfit setting for n=242.
-- [ ] Stacking: OOF predictions of RF + XGB + LGBM + CatBoost → LogReg
-      meta-learner (typical +0.01–0.03 AUC on small tabular data).
-- [ ] Pin new deps identically in `training/requirements.txt` and
+- [x] CatBoost (ordered boosting, strong on n<1k, raw categories).
+- [x] HistGradientBoosting as sklearn-native baseline.
+- [x] Regularized small grids: `num_leaves ∈ {7, 15, 31}`,
+      `min_child_samples ∈ {10, 20}`, feature_fraction=0.8 for LightGBM. Shallow + high leaf minimum is the anti-overfit setting for n=242.
+- [x] Stacking: OOF predictions of RF + XGB + HistGBM → LogReg meta-learner.
+      Inner preprocessing isolation remains a follow-up; stacking won no target.
+- [x] Pin new deps identically in `training/requirements.txt` and
       `backend/requirements.txt` (unpickling requires version match).
 
 ## 5. Feature engineering backlog (each judged by repeated-CV delta, not test)
@@ -96,7 +115,7 @@ Grounding facts (measured on `dataset/dataset.csv`, n=303):
       LCX/RCA. Report Brier score + calibration curves (PROBLEM.md asks for
       "preferably calibrated" vessel probabilities).
 - [ ] Keep API threshold at 0.5; report Youden-J / F1-optimal thresholds per
-      vessel in `metrics.json` so LCX/RCA recall (~0.33–0.39) is contextualized.
+      vessel in `metrics.json` so LCX/RCA recall (~0.46/~0.39) is contextualized.
 
 ## 7. Non-goals (with reasons)
 
@@ -110,10 +129,14 @@ Grounding facts (measured on `dataset/dataset.csv`, n=303):
 - Don't chase LCX/RCA past ~0.80 without more data; name the ceiling
   (weak univariate signals, 114–119 positives) in docs instead.
 
-## 8. Execution order
+## 8. Remaining execution order
 
-1. Repeated-CV harness + PR-AUC/Brier logging (unlocks honest comparison).
-2. LightGBM/CatBoost candidates + stacking.
-3. Classifier chains / CAD-as-OR experiment.
-4. Feature-engineering ablations; keep repeated-CV winners only.
-5. Calibration + final `evaluate.py` + metrics/docs refresh.
+1. Isolate preprocessing inside stacking's inner folds; make importance handling
+   robust to estimators without `feature_importances_` before expanding that track.
+2. Classifier-chain and CAD-as-OR experiments, judged by repeated CV.
+3. Feature-engineering ablations; retain only supported improvements.
+4. Calibration, uncertainty reporting and ROC/PR/calibration plots.
+5. Evaluate frozen winners, export dashboard metadata, and refresh docs.
+
+Patient-specific approximate permutation explanations, live frontend defaults,
+backend validation and artifact-backed dashboard metrics are implemented.

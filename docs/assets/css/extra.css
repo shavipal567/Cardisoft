@@ -1,0 +1,99 @@
+/* Cardisoft docs — custom layer on Material for MkDocs (teal/slate, red reserved
+   for safety callouts). No !important overrides of Material internals. */
+
+:root {
+  --cardisoft-teal: #009485;
+  --cardisoft-teal-soft: rgba(0, 148, 133, 0.08);
+  --cardisoft-warn-bg: rgba(229, 57, 53, 0.08);
+  --cardisoft-warn-border: #e53935;
+}
+
+/* ---- Homepage hero ---- */
+.cardisoft-hero {
+  border-radius: 0.4rem;
+  padding: 1.6rem 1.8rem;
+  margin: 0 0 1.2rem;
+  background:
+    linear-gradient(135deg, var(--cardisoft-teal-soft), transparent 60%),
+    var(--md-code-bg-color);
+  border: 1px solid var(--md-typeset-table-color, rgba(0, 0, 0, 0.12));
+}
+
+.cardisoft-hero h1 {
+  margin: 0 0 0.3rem;
+  font-size: 1.9em;
+}
+
+.cardisoft-hero p {
+  margin: 0.2rem 0;
+}
+
+.cardisoft-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.8rem;
+}
+
+.cardisoft-badges span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--cardisoft-teal-soft);
+  border: 1px solid var(--cardisoft-teal);
+  color: var(--cardisoft-teal);
+  white-space: nowrap;
+}
+
+[data-md-color-scheme="slate"] .cardisoft-badges span {
+  color: #4fd1c5;
+  border-color: #4fd1c5;
+}
+
+/* ---- Metric + field tables: right-aligned numbers, sticky header ---- */
+.md-typeset table:not([class]) th {
+  position: sticky;
+  top: 0;
+  background: var(--md-default-bg-color);
+  z-index: 1;
+}
+
+.md-typeset table:not([class]) td:nth-child(n + 2),
+.md-typeset table:not([class]) th:nth-child(n + 2) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.md-typeset table:not([class]) td:first-child,
+.md-typeset table:not([class]) th:first-child {
+  text-align: left;
+}
+
+/* ---- Safety disclaimer admonition: red tint, always noticeable ---- */
+.md-typeset .admonition.warning {
+  border-color: var(--cardisoft-warn-border);
+  background: var(--cardisoft-warn-bg);
+}
+
+.md-typeset .admonition.warning > .admonition-title {
+  background: rgba(229, 57, 53, 0.14);
+}
+
+.md-typeset .admonition.warning > .admonition-title::before {
+  background-color: var(--cardisoft-warn-border);
+}
+
+/* ---- Tighter code blocks, readable line length ---- */
+.md-typeset pre > code {
+  font-size: 0.78em;
+}
+
+.md-typeset .grid.cards > ul > li {
+  border-top: 3px solid var(--cardisoft-teal);
+}
+
+/* ---- Announce bar: keep it slim ---- */
+.md-banner {
+  font-size: 0.75rem;
+}

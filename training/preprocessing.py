@@ -12,7 +12,7 @@ import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, RobustScaler
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, RobustScaler, StandardScaler
 
 LEAKAGE_COLUMNS = ["LAD", "LCX", "RCA", "Cath"]
 
@@ -51,6 +51,9 @@ NOMINAL_FEATURES = ["Sex", "BBB", "VHD", "Region RWMA"]
 
 ALL_INPUT_FEATURES = NUMERIC_FEATURES + YN_FEATURES + NOMINAL_FEATURES
 
+# Categorical block for the native track (see build_native_preprocessor).
+NATIVE_CAT_FEATURES = YN_FEATURES + NOMINAL_FEATURES
+
 
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """Normalize known data quirks. Idempotent; safe for train and inference."""
@@ -76,6 +79,43 @@ def build_preprocessor() -> ColumnTransformer:
         ("num", numeric_pipe, NUMERIC_FEATURES),
         ("cat", categorical_pipe, YN_FEATURES + NOMINAL_FEATURES),
     ])
+
+
+def build_native_preprocessor() -> ColumnTransformer:
+    """Native-categorical track for LightGBM / CatBoost.
+
+    Numerics identical to the one-hot track; categoricals become integer
+    codes (-1 = unknown/missing) instead of one-hot columns. Output column
+    order is [NUMERIC_FEATURES..., NATIVE_CAT_FEATURES...], so categorical
+    positions are ``range(len(NUMERIC_FEATURES), len(ALL_INPUT_FEATURES))``.
+    """
+    numeric_pipe = Pipeline([
+        ("imputer", SimpleImputer(strategy="median")),
+        ("scaler", RobustScaler()),
+    ])
+    categorical_pipe = Pipeline([
+        ("imputer", SimpleImputer(strategy="most_frequent")),
+        ("encoder", OrdinalEncoder(handle_unknown="use_encoded_value",
+                                  unknown_value=-1, encoded_missing_value=-1)),
+    ])
+    return ColumnTransformer([
+        ("num", numeric_pipe, NUMERIC_FEATURES),
+        ("cat", categorical_pipe, NATIVE_CAT_FEATURES),
+    ])
+
+
+def build_voting_preprocessor() -> Pipeline:
+    ct = build_preprocessor()
+    return Pipeline([
+        ("onehot", ct),
+        ("scaler", StandardScaler(with_mean=False)),
+    ])
+
+
+def native_cat_indices() -> list:
+    """Column positions of categorical codes in native-track output."""
+    start = len(NUMERIC_FEATURES)
+    return list(range(start, start + len(NATIVE_CAT_FEATURES)))
 
 
 def encode_target(series: pd.Series, positive: str) -> pd.Series:

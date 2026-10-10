@@ -1,11 +1,10 @@
+import LoadingStatus from "./LoadingStatus";
 import type { ExplainResponse, Pred, Target } from "../api";
-import { FIELDS } from "../fields";
+import { fieldValueLabel } from "../fields";
 import { AREA, band, plainName } from "../plain";
 
 function show(name: string, value: number | string) {
-  const f = FIELDS.find((x) => x.key === name);
-  if (f?.type === "toggle") return value === 1 ? f.on ?? "yes" : f.off ?? "no";
-  return String(value);
+  return typeof value === "number" ? fieldValueLabel(name, value) : value;
 }
 
 export default function PatientSummary(props: {
@@ -35,7 +34,7 @@ export default function PatientSummary(props: {
         narrowed by 50% or more.
       </p>
 
-      {loading && <p className="note">Loading details...</p>}
+      {loading && <LoadingStatus label={`Explaining ${target}…`} detail="Preparing a plain-language summary of the contributing inputs." />}
 
       {up.length > 0 && (
         <>
@@ -72,6 +71,7 @@ export default function PatientSummary(props: {
         </>
       )}
 
+      {expl?.note && <p className="note">{expl.note}</p>}
       <p className="note">
         This is a computer estimate to help start a conversation, not a diagnosis. Only a doctor can tell
         you what is happening, usually with scans or other tests. A lower estimate does not mean you are
