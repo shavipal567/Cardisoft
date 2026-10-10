@@ -125,7 +125,7 @@
 .risk-card .pct { margin-top: 8px; font-size: 36px; }
 .risk-card .note { font-size: 11px; }
 .risk-card .pill { align-self: flex-start; }
-.results-detail-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; margin-top: 20px; align-items: start; }
+.results-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; margin-top: 20px; align-items: start; }
 .results-detail-grid > * { min-width: 0; margin: 0; }
 .results-panel details { overflow-x: auto; }
 .quote { margin: 32px 0 0; padding: 16px 0 0; border: 0; border-top: 1px solid var(--line); background: transparent; border-radius: 0; font-size: 13px; color: var(--muted); }
@@ -181,7 +181,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue-d); 
 .field { min-width: 0; }
 
 /* Anatomical views and compact, accessible artery selectors. */
-.heart-view-controls { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+.heart-view-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
 .heart-view-controls button, .artery-select {
   font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
   border: 1px solid var(--input-line); border-radius: 8px; padding: 8px 10px;
@@ -190,7 +190,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue-d); 
 .heart-view-controls button[aria-pressed="true"], .artery-select[aria-pressed="true"] {
   background: var(--green); color: var(--green-d); border-color: var(--accent);
 }
-.coronary-viewer .tech-canvas { height: 460px; }
+.coronary-viewer .tech-canvas { height: clamp(520px, 60vh, 660px); margin-top: 20px; margin-bottom: 24px; }
 .coronary-label { position: absolute; visibility: hidden; transform: translate(-50%, -50%); z-index: 2; display: flex; align-items: center; gap: 8px; white-space: nowrap;
   border: 1px solid var(--input-line); background: var(--card); color: var(--text);
   border-radius: 8px; padding: 7px 10px; font-size: 12px; cursor: pointer; }
@@ -207,7 +207,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue-d); 
 .heart-credits a { color: var(--blue-d); }
 @media (max-width: 600px) {
   .coronary-viewer .heart-head { align-items: flex-start; flex-direction: column; }
-  .coronary-viewer .tech-canvas { height: 380px; }
+  .coronary-viewer .tech-canvas { height: 440px; margin-top: 16px; margin-bottom: 20px; }
   .heart-side { top: auto; bottom: 42px; font-size: 10px; }
   .coronary-viewer .hud { font-size: 9px; }
 }
@@ -222,10 +222,81 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue-d); 
 .heart-route-control label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
 .heart-route-control input { width: 17px; height: 17px; accent-color: var(--accent); flex: none; }
 
-.heart-locate-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 12px; }
+.heart-locate-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
 .heart-locate-controls button { display: flex; flex-direction: column; gap: 4px; padding: 10px 8px;
   border: 1px solid var(--input-line); border-radius: 8px; background: var(--chip); color: var(--text);
   font: inherit; text-align: left; cursor: pointer; }
 .heart-locate-controls b { font-size: 13px; }
 .heart-locate-controls span { font-size: 10px; line-height: 1.4; }
 .heart-locate-controls button[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.heart-opacity-control { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px;
+  margin: 0 0 14px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 12px; }
+.heart-opacity-control label, .heart-opacity-control output { font-weight: 700; color: var(--text); }
+.heart-opacity-control input { grid-column: 1 / -1; width: 100%; margin: 0; min-height: 24px; accent-color: var(--accent); cursor: pointer; }
+.heart-opacity-control span { color: var(--muted); font-size: 11px; }
+.heart-opacity-control span:last-child { text-align: right; }
+.heart-opacity-control input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* Dedicated anatomy workspace: the model leads, controls stay alongside it. */
+.coronary-viewer { padding: 24px; }
+.coronary-viewer .heart-head { align-items: center; gap: 20px; margin-bottom: 20px; }
+.coronary-viewer .heart-head h3 { font-size: 22px; margin: 0; }
+.coronary-viewer .heart-head .eyebrow { margin: 0 0 6px; font-size: 10px; }
+.heart-header-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.heart-header-actions button, .heart-zoom-controls button { border: 1px solid var(--input-line); border-radius: 8px; background: var(--chip); color: var(--text); font: inherit; font-size: 12px; font-weight: 700; padding: 10px 12px; cursor: pointer; }
+.heart-header-actions button:last-child { background: var(--blue-d); color: var(--card); }
+.heart-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 20px; align-items: start; }
+.heart-workspace > * { min-width: 0; }
+.coronary-viewer .tech-canvas { height: clamp(560px, 64vh, 700px); margin: 0;
+  background: radial-gradient(ellipse at 50% 45%, var(--canvas2), var(--canvas1) 78%); }
+.heart-inspector { padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--chip); }
+.heart-inspector-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
+.heart-inspector-heading h4 { margin: 0; color: var(--text-strong); font-size: 12px; }
+.heart-inspector-heading > span { font-size: 10px; color: var(--muted); }
+.heart-inspector .heart-locate-controls { grid-template-columns: minmax(0, 1fr); gap: 8px; margin-bottom: 24px; }
+.heart-inspector .heart-locate-controls button { padding: 12px; gap: 5px; background: var(--card); }
+.artery-card-heading { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.artery-card-heading b { display: flex; align-items: center; gap: 7px; }
+.artery-card-heading i { width: 8px; height: 8px; border-radius: 50%; }
+.artery-card-heading strong { font-size: 18px; color: var(--text-strong); }
+.heart-locate-controls .artery-card-course { font-size: 10px; color: var(--muted); }
+.heart-inspector .heart-display-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.heart-inspector .heart-display-controls button { font-size: 10px; padding: 9px 5px; }
+.heart-inspector .heart-opacity-control { padding: 0; border: 0; margin: 16px 0 8px; }
+.heart-opacity-control.inactive { opacity: 0.55; }
+.heart-opacity-control input:disabled { cursor: not-allowed; }
+.heart-inspector .heart-route-control { margin: 18px 0; padding: 12px 0; border-width: 1px 0; border-radius: 0; }
+.heart-mini-legend .legend-labels { font-size: 10px; }
+.heart-zoom-controls { width: max-content; max-width: calc(100% - 24px); position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 5px; border-radius: 12px; background: var(--label-bg); border: 1px solid var(--line); white-space: nowrap; }
+.heart-zoom-controls button { font-size: 20px; line-height: 1; min-width: 36px; padding: 8px; }
+.heart-zoom-controls span { font-size: 10px; color: var(--muted); }
+.heart-reference-note { margin: 14px 0 20px; }
+.heart-details { border-top: 1px solid var(--line); padding-top: 16px; }
+.heart-details > summary { font-size: 12px; font-weight: 700; cursor: pointer; color: var(--text-strong); }
+.coronary-viewer.expanded { position: fixed; inset: 16px; z-index: 1000; overflow: auto; background: var(--card); box-shadow: 0 0 0 100vmax rgb(0 0 0 / 55%); }
+.coronary-viewer.expanded .tech-canvas { height: max(560px, calc(100dvh - 210px)); }
+.heart-header-actions button:focus-visible, .heart-view-controls button:focus-visible,
+.heart-locate-controls button:focus-visible, .heart-display-controls button:focus-visible,
+.heart-zoom-controls button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 900px) {
+  .heart-workspace { grid-template-columns: minmax(0, 1fr); }
+  .heart-inspector .heart-locate-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .heart-inspector .heart-display-controls { max-width: 320px; }
+}
+@media (max-width: 600px) {
+  .coronary-viewer { padding: 16px; }
+  .coronary-viewer .heart-head { align-items: flex-start; gap: 12px; }
+  .heart-header-actions { width: 100%; }
+  .heart-header-actions button { flex: 1; }
+  .coronary-viewer .tech-canvas { height: 460px; }
+  .heart-inspector { padding: 12px; }
+  .heart-inspector .heart-locate-controls { gap: 5px; }
+  .heart-inspector .heart-locate-controls button { padding: 9px 6px; }
+  .artery-card-heading { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .heart-locate-controls .artery-card-course { display: none; }
+  .heart-zoom-controls { gap: 6px; bottom: 12px; }
+  .heart-zoom-controls span { width: 145px; max-width: 145px; white-space: normal; text-align: center; }
+  .coronary-viewer.expanded { inset: 6px; }
+  .coronary-viewer.expanded .tech-canvas { height: 60dvh; min-height: 380px; }
+}

@@ -28,7 +28,7 @@ class HeartErrorBoundary extends Component<{ children: ReactNode }, { error: boo
   }
 }
 
-function CameraControls({ view, revision, onRotate }: { view: View; revision: number; onRotate: () => void }) {
+function CameraControls({ view, revision, zoom, onRotate }: { view: View; revision: number; zoom: { factor: number; sequence: number }; onRotate: () => void }) {
   const { camera, size } = useThree();
   const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
   useEffect(() => {
@@ -39,6 +39,14 @@ function CameraControls({ view, revision, onRotate }: { view: View; revision: nu
     controls.current?.target.set(0, -0.05, 0);
     controls.current?.update();
   }, [camera, view, revision, size.width, size.height]);
+  useEffect(() => {
+    if (!zoom.sequence || !controls.current) return;
+    const target = controls.current.target;
+    const offset = camera.position.clone().sub(target);
+    offset.setLength(THREE.MathUtils.clamp(offset.length() * zoom.factor, 3, 9));
+    camera.position.copy(target).add(offset);
+    controls.current.update();
+  }, [camera, zoom]);
   return <OrbitControls ref={controls} makeDefault enablePan={false} minDistance={3} maxDistance={9}
     minPolarAngle={0.2} maxPolarAngle={Math.PI - 0.2} onStart={onRotate} />;
 }
@@ -104,35 +112,56 @@ function VesselLabel({ name, route, occluder, labels }: {
   return <Line points={[anchor, position]} color="#d4dce7" lineWidth={1} />;
 }
 
-function RegisteredHeart({ probabilities, selected, onSelect, labels, focus, showRoutes }: Pick<Props, "probabilities" | "selected" | "onSelect"> & { labels: LabelElements; focus: boolean; showRoutes: boolean }) {
+function RegisteredHeart({ probabilities, selected, onSelect, labels, focus, showRoutes, opacity }: Pick<Props, "probabilities" | "selected" | "onSelect"> & { labels: LabelElements; focus: boolean; showRoutes: boolean; opacity: number }) {
   const gltf = useGLTF(GLB_URL);
   const invalidate = useThree((state) => state.invalidate);
   const { heart, materials } = useMemo(() => {
     const heart = registerHeart(gltf.scene);
-    const materials = new Map<THREE.Material, THREE.MeshStandardMaterial>();
+    const materials = new Map<THREE.Material, { muted: THREE.MeshStandardMaterial; coloured: THREE.Material }>();
     heart.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       for (const source of Array.isArray(object.material) ? object.material : [object.material]) {
-        if (!materials.has(source)) materials.set(source, new THREE.MeshStandardMaterial({
-          color: "#617586", roughness: 0.95, metalness: 0, side: source.side,
-        }));
+        if (!materials.has(source)) {
+          // Clone the material, keeping the cached GLB and its textures intact.
+          const coloured = source.clone();
+          coloured.transparent = true;
+          coloured.depthWrite = false;
+          coloured.side = THREE.FrontSide;
+          materials.set(source, {
+            muted: new THREE.MeshStandardMaterial({
+              color: "#617586", roughness: 0.95, metalness: 0, side: source.side,
+            }),
+            coloured,
+          });
+        }
       }
     });
     return { heart, materials };
   }, [gltf.scene]);
   useEffect(() => {
-    const originals = new Map([...materials].map(([source, muted]) => [muted, source]));
+    materials.forEach(({ coloured }) => {
+      coloured.opacity = opacity;
+      const transparent = opacity < 1;
+      if (coloured.transparent !== transparent) {
+        coloured.transparent = transparent;
+        coloured.needsUpdate = true;
+      }
+      coloured.depthWrite = !transparent;
+    });
+    const originals = new Map([...materials].flatMap(([source, variants]) =>
+      [[variants.muted, source], [variants.coloured, source]] as [THREE.Material, THREE.Material][]));
     heart.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       const swap = (material: THREE.Material) => {
-        const source = originals.get(material as THREE.MeshStandardMaterial) ?? material;
-        return focus ? materials.get(source) ?? source : source;
+        const source = originals.get(material) ?? material;
+        const variants = materials.get(source);
+        return variants ? (focus ? variants.muted : variants.coloured) : source;
       };
       object.material = Array.isArray(object.material) ? object.material.map(swap) : swap(object.material);
     });
     invalidate();
-  }, [heart, materials, focus, invalidate]);
-  useEffect(() => () => { materials.forEach((material) => material.dispose()); }, [materials]);
+  }, [heart, materials, focus, opacity, invalidate]);
+  useEffect(() => () => { materials.forEach(({ muted, coloured }) => { muted.dispose(); coloured.dispose(); }); }, [materials]);
   const arteries = useMemo(() => loadCoronaries(), []);
   return <>
     <primitive object={heart} />
@@ -162,42 +191,64 @@ interface Props {
 export default function HeartViewer({ probabilities, classifications, selected, onSelect, dark }: Props) {
   const labels = useRef<Partial<Record<Vessel, HTMLButtonElement>>>({});
   const [focus, setFocus] = useState(true);
+  const [opacity, setOpacity] = useState(69);
   const [showRoutes, setShowRoutes] = useState(true);
   const [view, setView] = useState<View>("Anterior");
   const [revision, setRevision] = useState(0);
   const [rotated, setRotated] = useState(false);
-  return <div className="card coronary-viewer">
+  const [expanded, setExpanded] = useState(false);
+  const [zoom, setZoom] = useState({ factor: 1, sequence: 0 });
+  const expandButton = useRef<HTMLButtonElement>(null);
+  const viewer = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!expanded) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setExpanded(false); expandButton.current?.focus(); }
+      if (event.key === "Tab" && viewer.current) {
+        const controls = [...viewer.current.querySelectorAll<HTMLElement>("button, input, summary, a[href], [tabindex='0']")]
+          .filter((element) => !element.matches(":disabled") && element.getClientRects().length && getComputedStyle(element).visibility !== "hidden");
+        const first = controls[0], last = controls.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    window.addEventListener("keydown", escape);
+    return () => { document.body.style.overflow = previous; window.removeEventListener("keydown", escape); };
+  }, [expanded]);
+
+  function resetView() {
+    setView("Anterior");
+    setRevision((n) => n + 1);
+    setRotated(false);
+  }
+  function locate(name: Vessel) {
+    setShowRoutes(true);
+    setView(name === "LCX" ? "Left lateral" : "Anterior");
+    setRevision((n) => n + 1);
+    setRotated(false);
+    onSelect(name);
+  }
+
+  return <div ref={viewer} className={"card coronary-viewer" + (expanded ? " expanded" : "")}
+    role={expanded ? "dialog" : undefined} aria-modal={expanded || undefined}
+    aria-label={expanded ? "Expanded heart anatomy" : undefined}>
     <div className="heart-head">
-      <h3>Heart anatomy</h3>
-      <span className="tech-tag">Illustrative 3D model</span>
+      <div><p className="eyebrow">EXPLORE IN 3D</p><h3>Heart anatomy</h3>
+        <p className="note">Select an artery to bring its course and estimate into focus.</p></div>
+      <div className="heart-header-actions">
+        <button onClick={resetView}>Reset view</button>
+        <button ref={expandButton} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+          {expanded ? "Exit expanded view" : "Expand view"}
+        </button>
+      </div>
     </div>
     <div className="heart-view-controls" role="group" aria-label="Heart viewing direction">
       {(Object.keys(VIEWS) as View[]).map((name) => <button key={name} aria-pressed={!rotated && view === name}
         onClick={() => { setView(name); setRevision((n) => n + 1); setRotated(false); }}>{name}</button>)}
     </div>
-    <div className="heart-route-control">
-      <label><input type="checkbox" checked={showRoutes}
-        onChange={(event) => { setShowRoutes(event.target.checked); if (!event.target.checked) setFocus(false); }} />
-        Show LAD, LCX and RCA highlights</label>
-      <p className="note">Highlights follow mapped reference courses on the heart surface; they are not verified segmentations of the GLB’s native vessels.</p>
-    </div>
-    {showRoutes && <div className="heart-display-controls" role="group" aria-label="Heart colour display">
-      <button aria-pressed={focus} onClick={() => setFocus(true)}>Vessel focus</button>
-      <button aria-pressed={!focus} onClick={() => setFocus(false)}>Original colours</button>
-      <span>{focus ? "Muted heart surface highlights the coronary arteries." : "Original heart colours with outlined coronary arteries."}</span>
-    </div>}
-    <div className="heart-locate-controls" role="group" aria-label="Locate coronary artery">
-      {VESSELS.map((name) => <button key={name} aria-pressed={selected === name}
-        onClick={() => {
-          setShowRoutes(true);
-          setView(name === "LCX" ? "Left lateral" : "Anterior");
-          setRevision((n) => n + 1);
-          setRotated(false);
-          onSelect(name);
-        }}>
-        <b>{name}</b><span>{VESSEL_META[name].full}</span>
-      </button>)}
-    </div>
+    <div className="heart-workspace">
     <HeartErrorBoundary>
       <div className="canvas-wrap tech-canvas" role="group" aria-label="Interactive coronary artery model">
         <Canvas frameloop="demand" camera={{ position: VIEWS.Anterior, fov: 40 }} dpr={[1, 1.5]}>
@@ -205,9 +256,9 @@ export default function HeartViewer({ probabilities, classifications, selected, 
           <directionalLight position={[2, 4, 5]} intensity={2} />
           <directionalLight position={[-3, 1, -4]} intensity={1.4} />
           <Suspense fallback={<Html center><span className="heart-loading">Loading heart anatomy…</span></Html>}>
-            <RegisteredHeart probabilities={probabilities} selected={selected} onSelect={onSelect} labels={labels} focus={focus} showRoutes={showRoutes} />
+            <RegisteredHeart probabilities={probabilities} selected={selected} onSelect={onSelect} labels={labels} focus={focus} showRoutes={showRoutes} opacity={opacity / 100} />
           </Suspense>
-          <CameraControls view={view} revision={revision} onRotate={() => setRotated(true)} />
+          <CameraControls view={view} revision={revision} zoom={zoom} onRotate={() => setRotated(true)} />
         </Canvas>
         {showRoutes && VESSELS.map((name) => <button key={name}
           ref={(element) => { if (element) labels.current[name] = element; else delete labels.current[name]; }}
@@ -222,9 +273,47 @@ export default function HeartViewer({ probabilities, classifications, selected, 
           <span className="heart-side heart-side-left">Patient’s {view === "Anterior" ? "right" : "left"}</span>
           <span className="heart-side heart-side-right">Patient’s {view === "Anterior" ? "left" : "right"}</span>
         </>}
-        <div className="hud hud-br">Drag to rotate · Scroll to zoom</div>
+        <div className="heart-zoom-controls" role="group" aria-label="Zoom controls">
+          <button aria-label="Zoom out" onClick={() => setZoom((z) => ({ factor: 1.18, sequence: z.sequence + 1 }))}>−</button>
+          <span>Drag to rotate · Pinch or scroll to zoom</span>
+          <button aria-label="Zoom in" onClick={() => setZoom((z) => ({ factor: 1 / 1.18, sequence: z.sequence + 1 }))}>+</button>
+        </div>
       </div>
     </HeartErrorBoundary>
+      <aside className="heart-inspector" aria-label="Artery and appearance controls">
+        <div className="heart-inspector-heading"><h4>Coronary arteries</h4><span>Select to locate</span></div>
+        <div className="heart-locate-controls" role="group" aria-label="Locate coronary artery">
+          {VESSELS.map((name) => <button key={name} aria-pressed={selected === name} onClick={() => locate(name)}>
+            <div className="artery-card-heading"><b><i style={{ background: probabilities[name] === undefined ? "#94a3b8" : riskColor(probabilities[name]) }} />{name}</b>
+              <strong>{probabilities[name] === undefined ? "—" : `${Math.round(probabilities[name] * 100)}%`}</strong></div>
+            <span>{VESSEL_META[name].full}</span>
+            <span className="artery-card-course">{VESSEL_META[name].course}</span>
+          </button>)}
+        </div>
+        <div className="heart-inspector-heading"><h4>Appearance</h4></div>
+        <div className="heart-display-controls" role="group" aria-label="Heart colour display">
+          <button aria-pressed={focus} onClick={() => setFocus(true)}>Vessel focus</button>
+          <button aria-pressed={!focus} onClick={() => setFocus(false)}>Original colours</button>
+        </div>
+        <div className={"heart-opacity-control" + (focus ? " inactive" : "")}>
+          <label htmlFor="heart-opacity">Heart opacity</label>
+          <output htmlFor="heart-opacity">{focus ? "Solid" : `${opacity}%`}</output>
+          <input id="heart-opacity" type="range" min={0} max={100} step={1} value={opacity} disabled={focus}
+            aria-valuetext={`${opacity} percent`} aria-describedby="heart-opacity-help"
+            onChange={(event) => setOpacity(Number(event.target.value))} />
+          <span>Transparent</span><span>Opaque</span>
+        </div>
+        <p className="note" id="heart-opacity-help">{focus ? "Choose Original colours to adjust transparency." : "Opacity changes the heart surface. Artery highlights stay solid."}</p>
+        <div className="heart-route-control">
+          <label><input type="checkbox" checked={showRoutes} onChange={(event) => setShowRoutes(event.target.checked)} />
+            Artery highlights &amp; labels</label>
+        </div>
+        <div className="heart-mini-legend"><div className="legend-bar" /><div className="legend-labels"><span>Lower estimate</span><span>Higher estimate</span></div></div>
+      </aside>
+    </div>
+    <p className="note heart-reference-note">Illustrative reference paths on the heart surface; not verified native-vessel segmentation or patient-specific anatomy.</p>
+    <details className="heart-details">
+      <summary>Artery details &amp; anatomy notes</summary>
     <div className="coronary-table-wrap" tabIndex={0} role="region" aria-label="Coronary artery estimates">
       <table className="spec-table">
         <thead><tr><th>Artery</th><th>Reference course</th><th>Estimate</th><th>Class</th></tr></thead>
@@ -254,5 +343,6 @@ export default function HeartViewer({ probabilities, classifications, selected, 
     <p className="note heart-credits">Anatomy reference: <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4919754/" target="_blank" rel="noreferrer">normal coronary anatomy</a>.
       {" "}Heart asset by <a href="https://sketchfab.com/3d-models/anatomically-correct-human-heart-54fa880728d14c11afff78be8721620a" target="_blank" rel="noreferrer">Pigcraft</a>
       {" "}(<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>); orientation and overlays adapted.</p>
+    </details>
   </div>;
 }

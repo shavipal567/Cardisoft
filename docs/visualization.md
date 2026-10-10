@@ -38,7 +38,7 @@ layer as interpretive context in the UI copy.
 
 Live mode is the default. Explicit demo mode uses labelled fixed fixtures.
 The full-width grouped form sits above results; the heart and explanation
-share a row on wide screens and stack on smaller screens.
+each occupy a full-width row, with the explanation below the heart at all screen sizes.
 
 ## Coronary surface registration
 
@@ -83,9 +83,11 @@ restores the imported materials without modifying the cached asset. Both modes
 use wider coronary tubes with dark silhouette outlines; the selected artery
 has a white outline. Unlit, non-tone-mapped overlay colours match the numeric
 risk legend. These display widths aid visibility and do not represent measured
-artery diameters. Depth testing remains enabled, so vessels behind the heart
-must be inspected using the lateral/posterior views rather than drawn through
-the myocardium. Registered centreline coordinates remain unchanged.
+artery diameters. Depth testing remains enabled. In Original colours mode, cloned heart materials
+use user-adjustable opacity (0–100%, initially 69%), front faces and disabled depth writing, while artery overlays
+remain opaque. Posterior courses can be glimpsed through the translucent heart;
+use lateral/posterior views to inspect them directly. Vessel focus retains an
+opaque surface. Registered centreline coordinates remain unchanged.
 
 ## Native vessel identification status
 
@@ -108,3 +110,17 @@ anatomy alone, and remain separate illustrations rather than verified native
 vessel identifications.
 The model probabilities remain in the table and are not encoded by the native
 asset colours. Enabling reference routes does not verify a native mapping.
+
+## Viewer workspace and controls
+
+The full-width heart panel contains a large viewport and a compact desktop
+inspector with artery probability cards, appearance modes, opacity and highlight
+controls. The inspector stacks below the viewport on narrower screens. Detailed
+artery courses, classifications and anatomy notes are collapsible. The explanation
+panel remains below the entire heart panel.
+
+Camera presets and artery location buttons are complemented by explicit zoom
+buttons and Reset view. Expanded view uses a modal workspace, locks background
+scrolling, keeps keyboard focus inside and exits with Escape. The opacity setting
+is retained when switching modes; the slider is disabled while Vessel focus is
+opaque. Source mesh registration and prediction semantics are unchanged.

@@ -104,3 +104,15 @@ The asset metadata credits Pigcraft under CC BY 4.0; attribution and the
 anatomical reference appear in the viewer. The registration is illustrative,
 not clinically validated or patient-specific, and does not locate lesions.
 Its direct import still makes the initial JavaScript bundle large.
+
+Original colours uses cloned heart materials at user-adjustable opacity (0–100%, initially 69%) with depth writing
+disabled; coronary highlights remain opaque. Source GLB materials/textures are
+not mutated. The muted Vessel focus mode remains opaque.
+
+The anatomy workspace places the viewport next to an artery/appearance inspector
+on desktop, stacking the inspector below the model on tablet/mobile. Artery cards
+show probabilities and orient the camera on selection. Zoom buttons complement
+mouse/touch controls; Reset view restores the anterior camera. Expanded view
+locks background scrolling, contains keyboard focus and closes with Escape.
+The artery table and reference/credit notes live in a collapsible details panel.
+The opacity slider remains visible but disabled in the opaque Vessel focus mode.
