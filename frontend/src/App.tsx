@@ -1,5 +1,5 @@
 import type { HeartViewerHandle } from "./components/HeartViewer";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Cell, ResponsiveContainer, ReferenceLine } from "recharts";
 import { predict, explain, getInputDefaults, DEMO_MODE } from "./api";
 import type { PredictResponse, ExplainResponse, Target, Patient, Pred, InputValues } from "./api";
@@ -17,12 +17,18 @@ import type { Assessment } from "./assessment";
 import ModelInfo from "./components/ModelInfo";
 import PatientSummary from "./components/PatientSummary";
 import CarePlan from "./components/CarePlan";
+import ReadAloud from "./components/ReadAloud";
+import VoiceInput from "./components/VoiceInput";
+import { buildScript } from "./speech/script";
+import type { SectionId } from "./speech/script";
+import type { Parsed } from "./speech/parse";
 import { extractPdfText } from "./pdf/extractText";
 import { parsePatientFromText } from "./pdf/fieldMap";
 import type { PdfHit } from "./pdf/fieldMap";
 import HeartViewer from "./components/HeartViewer";
 import "./App.css";
 import "./features.css";
+import "./audio.css";
 
 const NEUTRAL = 0.005; // |contribution| below this is shown as neutral
 
@@ -107,6 +113,8 @@ export default function App() {
   const [pdfHits, setPdfHits] = useState<PdfHit[]>([]);
   const [pdfSkipped, setPdfSkipped] = useState<{ key: string; reason: string }[]>([]);
   const [pdfError, setPdfError] = useState("");
+  const [reading, setReading] = useState<SectionId | null>(null);
+  const [announcement, setAnnouncement] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -186,6 +194,18 @@ export default function App() {
     setName("Sample patient");
   }
 
+  function applyParsed(p: Parsed) {
+    const parsedValues = { ...p.numbers, ...p.toggles };
+    setValues((previous) => ({ ...previous, ...parsedValues }));
+    setSources((previous) => ({
+      ...previous,
+      ...Object.fromEntries(Object.keys(parsedValues).map((key) => [key, "Entered" as InputSource])),
+    }));
+    setError("");
+    if (p.gender) pickGender(p.gender);
+    setAnnouncement(`Applied ${p.count} values from voice input. Please review the form, then press Analyze patient.`);
+  }
+
   function resetAssessment() {
     taskEpoch.current += 1;
     setValues({}); setSources({}); setName(""); setGender(""); setFieldSearch(""); setOpenGroups([GROUPS[0].title]);
@@ -193,6 +213,7 @@ export default function App() {
     setExplanations({}); setExplainErrors({}); setTarget("CAD"); setError(""); setLoading(false);
     setPdfParsing(false); setPdfFileName(""); setPdfHits([]); setPdfSkipped([]); setPdfError("");
     setResetNotice("New assessment started. Patient details, imports, results and comparison have been cleared.");
+    setReading(null); setAnnouncement("New assessment started.");
     requestAnimationFrame(() => { jumpTo(inputRef.current); document.getElementById("patient-name")?.focus({ preventScroll: true }); });
   }
 
@@ -225,6 +246,7 @@ export default function App() {
       setExplanations({});
       setExplainErrors({});
       setTarget("CAD");
+      setAnnouncement(`Analysis complete${submittedName ? " for " + submittedName : ""}. Overall CAD estimate ${Math.round(r.cad.probability * 100)} percent. Use the Listen button to hear the report.`);
     } catch (e) {
       if (epoch === taskEpoch.current) setError((e as Error).message);
     } finally {
@@ -286,6 +308,13 @@ export default function App() {
 
   const predOf = (t: Target): Pred | null =>
     !result ? null : t === "CAD" ? result.cad : result.vessels[t];
+
+  const segments = useMemo(
+    () => result && analyzed
+      ? buildScript({ clinician, name: analyzedName, result, patient: analyzed, cadExpl: explanations["CAD"] })
+      : [],
+    [clinician, analyzedName, result, analyzed, explanations],
+  );
   const probabilities = result
     ? {
         LAD: result.vessels.LAD.probability,
@@ -301,25 +330,21 @@ export default function App() {
       }
     : {};
 
-  
   const expl = explanations[target];
-
   const chartData = expl
     ? [...expl.features]
         .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
         .slice(0, 8)
-        .map((f) => ({
-          ...f,
-          label: f.assumed ? `${f.name} (auto-supplied)` : f.name,
-        }))
+         .map((f) => ({ ...f, label: f.assumed ? `${f.name} (default)` : f.name }))
     : [];
-
   const selected = predOf(target);
-
+  
 
   const axis = dark ? "#93a7bd" : "#7b8da1";
+
   return (
     <div className="page">
+      <div className="sr-only" role="status" aria-live="polite">{announcement}</div>
       <header className="top">
         <Logo />
         <div className="controls">
@@ -400,6 +425,8 @@ export default function App() {
                 <button className="btn soft" onClick={loadSample} disabled={pdfParsing}>Load sample patient</button>
               </div>
             </div>
+
+            <VoiceInput onApply={applyParsed} />
 
             {clinician && (
           <details className="pdf-box">
@@ -622,8 +649,9 @@ export default function App() {
                     Results for <b>{analyzedName}</b>
                   </p>
                 )}
+                <ReadAloud segments={segments} onSection={setReading} />
 
-                <div className="risk-grid">
+                <div className={"risk-grid" + (reading === "summary" || reading === "vessels" ? " reading" : "")}>
                   {TARGETS.map((t, i) => {
                     const p = predOf(t)!;
                     const pct = Math.round(p.probability * 100);
@@ -676,7 +704,7 @@ export default function App() {
                     dark={dark}
                   />
                 </div>
-                <div className="one-col">
+                <div className={"one-col" + (reading === "factors" ? " reading" : "")}>
                   {explainError && <p className="error" role="alert">Explanation unavailable: {explainError}</p>}
                   {!clinician && selected ? (
                     <PatientSummary target={target} pred={selected} expl={expl} loading={explainLoading} />

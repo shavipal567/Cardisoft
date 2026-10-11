@@ -1,47 +1,39 @@
+
 import type { Patient, PredictResponse } from "../api";
 import { buildPlan } from "../careplan";
 
-export default function CarePlan(props: { patient: Patient; result: PredictResponse; clinician: boolean }) {
-  const { patient, result, clinician } = props;
+export default function CarePlan({
+  patient,
+  result,
+  clinician,
+}: {
+  patient: Patient;
+  result: PredictResponse;
+  clinician: boolean;
+}) {
   const plan = buildPlan(patient, result, clinician);
 
   return (
-    <div className="card" style={{ marginTop: 14 }}>
-      <h3>{clinician ? "Considerations (decision support)" : "Next steps to talk through with your doctor"}</h3>
-      <p className="plain-main">{plan.headline}</p>
+    <section className="card care-plan">
+      <h3>{clinician ? "Clinical considerations" : "Your next steps"}</h3>
+      <p>{plan.headline}</p>
 
-      <div>
-        {plan.items.map((it) => (
-          <div className="plan-item" key={it.title}>
-            <div className="plan-dot" />
-            <div>
-              <b>{it.title}</b>
-              <div className="plan-text">{it.text}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {!clinician && (
-        <>
-          <h4 className="plain-h">Questions you could ask</h4>
-          <ul className="plain-list">
-            {plan.questions.map((q) => (
-              <li key={q}>{q}</li>
-            ))}
-          </ul>
-        </>
+      {plan.items.length > 0 && (
+        <ul className="plain-list">
+          {plan.items.map((item, index) => (
+            <li key={`${item.title}-${index}`}>
+              <strong>{item.title}:</strong> {item.text}
+            </li>
+          ))}
+        </ul>
       )}
 
-      <div className="urgent">
-        <b>Get urgent help (112 or 108)</b> for chest pain or pressure lasting more than a few minutes, pain
-        spreading to the arm, jaw or back, shortness of breath, a cold sweat, or fainting. Do not wait for this
-        tool.
-      </div>
-      <p className="note">
-        General reference thresholds (assuming mg/dL and mmHg) are used to prompt questions, and your doctor's
-        ranges may differ. Nothing here is a diagnosis or treatment advice.
-      </p>
-    </div>
+      <h4>Questions to ask your doctor</h4>
+      <ul className="plain-list">
+        {plan.questions.map((question) => (
+          <li key={question}>{question}</li>
+        ))}
+      </ul>
+    </section>
   );
 }
