@@ -1,5 +1,4 @@
 import itertools
-import warnings
 
 import numpy as np
 from sklearn.base import clone
@@ -8,9 +7,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, fbeta_score, recall_score
 from sklearn.model_selection import StratifiedKFold, cross_val_predict
 from xgboost import XGBClassifier
-from lightgbm import LGBMClassifier
 
-from native_models import CatBoostNative
+from native_models import CatBoostNative, LGBMArrayClassifier
 from preprocessing import native_cat_indices
 
 
@@ -30,6 +28,7 @@ class VotingClassifier:
         return self
 
     def predict_proba(self, X):
+        """Return class probabilities in ``classes_`` order: [P(0), P(1)]."""
         X = np.asarray(X, dtype=float)
         n = len(self.fitted_estimators_)
         w = self.weights if self.weights is not None else [1.0] * n
@@ -41,17 +40,21 @@ class VotingClassifier:
         proba = np.zeros(len(X), dtype=float)
         for wi, est in zip(w, self.fitted_estimators_):
             proba += wi * np.asarray(est.predict_proba(X))[:, 1]
-        return proba / w_sum
+        proba /= w_sum
+        return np.column_stack((1.0 - proba, proba))
 
     def predict(self, X):
-        return (self.predict_proba(X) >= self.threshold).astype(int)
+        return (self.predict_proba(X)[:, 1] >= self.threshold).astype(int)
 
     @property
     def feature_importances_(self):
         imps = []
         for est in self.fitted_estimators_:
-            v = np.asarray(getattr(est, "feature_importances_", None), dtype=float)
-            if v is None or v.shape[0] == 0 or v.sum() <= 0:
+            v = getattr(est, "feature_importances_", None)
+            if v is None:
+                continue
+            v = np.asarray(v, dtype=float)
+            if v.size == 0 or v.sum() <= 0:
                 continue
             imps.append(v / v.sum())
         if not imps:
@@ -59,35 +62,35 @@ class VotingClassifier:
         return np.mean(imps, axis=0)
 
 
-def build_voting_estimators(scale_pos):
+def build_voting_estimators(scale_pos, random_state=42):
     return [
         ("rf", RandomForestClassifier(
             n_estimators=400, max_depth=None, min_samples_leaf=1,
-            n_jobs=-1, random_state=42, class_weight="balanced",
+            n_jobs=-1, random_state=random_state, class_weight="balanced",
         )),
         ("xgb", XGBClassifier(
             n_estimators=400, max_depth=4, learning_rate=0.05,
             subsample=0.8, colsample_bytree=0.8, reg_lambda=1.0,
             scale_pos_weight=scale_pos, tree_method="hist",
-            eval_metric="logloss", n_jobs=-1, random_state=42,
+            eval_metric="logloss", n_jobs=-1, random_state=random_state,
         )),
         ("hgb", HistGradientBoostingClassifier(
             learning_rate=0.05, max_leaf_nodes=31, min_samples_leaf=20,
-            class_weight="balanced", random_state=42,
+            class_weight="balanced", random_state=random_state,
         )),
-        ("lgbm", LGBMClassifier(
+        ("lgbm", LGBMArrayClassifier(
             n_estimators=300, num_leaves=15, min_child_samples=10,
             learning_rate=0.05, feature_fraction=0.8, verbose=-1,
-            force_col_wise=True, n_jobs=-1, random_state=42,
+            force_col_wise=True, n_jobs=-1, random_state=random_state,
         )),
         ("cat", CatBoostNative(
             iterations=400, depth=4, learning_rate=0.05, l2_leaf_reg=3,
             auto_class_weights="Balanced", verbose=False,
-            allow_writing_files=False, random_seed=42,
+            allow_writing_files=False, random_seed=random_state,
         )),
         ("en", LogisticRegression(
             penalty="elasticnet", solver="saga", l1_ratio=0.5, C=1.0,
-            max_iter=5000, class_weight="balanced", random_state=42,
+            max_iter=5000, class_weight="balanced", random_state=random_state,
         )),
     ]
 
@@ -97,13 +100,10 @@ def optimize_voting_weights_and_threshold(estimators, X, y, cv=5, seed=42):
     y = np.asarray(y, dtype=int)
     skf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=seed)
     oof = np.zeros((len(y), len(estimators)))
-    for j, (name, est) in enumerate(estimators):
-        with warnings.catch_warnings():
-            if name == "lgbm":
-                warnings.filterwarnings("ignore", message="X does not have valid feature names")
-            oof[:, j] = cross_val_predict(
-                clone(est), X, y, cv=skf, method="predict_proba",
-            )[:, 1]
+    for j, (_, est) in enumerate(estimators):
+        oof[:, j] = cross_val_predict(
+            clone(est), X, y, cv=skf, method="predict_proba",
+        )[:, 1]
 
     individual_f2 = []
     for j in range(len(estimators)):
