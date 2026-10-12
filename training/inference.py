@@ -42,6 +42,7 @@ def _load_all():
             "training_git_hash": metadata.get("git_hash", "unavailable"),
             "model_kind": metadata.get("best", {}).get("model", "unknown"),
             "threshold": metadata.get("threshold", 0.5),
+            "metadata": metadata,
         }
     return bundle
 
@@ -69,7 +70,8 @@ def predict_patient(features: dict) -> dict:
         threshold = bundle[key].get("threshold", 0.5)
         Xt = prep.transform(df)
         proba = float(model.predict_proba(Xt)[0, 1])
-        out[key] = {"prediction": int(proba >= threshold), "probability": proba}
+        out[key] = {"prediction": int(proba >= threshold), "probability": proba,
+                    "threshold": float(threshold)}
     return {
         "cad": out["cad"],
         "vessels": {"LAD": out["lad"], "LCX": out["lcx"], "RCA": out["rca"]},

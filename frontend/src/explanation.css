@@ -1,0 +1,71 @@
+.explainability { --explain-positive: #e9657a; --explain-negative: #6bb6e3; --explain-neutral: #8796a6; --muted: #586f83; min-width: 0; }
+:root[data-theme="dark"] .explainability { --muted: #a4b5c6; }
+.explainability p { line-height: 1.55; }
+.explain-summary, .explain-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 20px; margin: 14px 0 20px; font-size: 12px; }
+.explain-summary dt, .explain-facts dt { color: var(--muted); margin-bottom: 4px; }
+.explain-summary dd, .explain-facts dd { margin: 0; font-weight: 650; color: var(--text-strong); overflow-wrap: anywhere; }
+.explain-summary { padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.explain-summary abbr { text-decoration: none; font-family: monospace; }
+.explain-chart-heading h4 { margin: 0 0 6px; font-size: 16px; color: var(--text-strong); }
+.explain-chart-heading p { margin: 0; font-size: 13px; color: var(--muted); }
+.explain-quality { font-size: 12px; font-weight: 600; margin: 14px 0; }
+.explain-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 7px 18px; margin: 12px 0; padding: 0; font-size: 11px; }
+.explain-legend li { display: flex; align-items: center; gap: 6px; }
+.explain-key { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 4px; color: #142e44; font-weight: 800; }
+.explain-key.positive, .explain-bar.positive, .explain-waterfall-bar.positive { background: var(--explain-positive); }
+.explain-key.negative, .explain-bar.negative, .explain-waterfall-bar.negative { background: var(--explain-negative); }
+.explain-key.neutral, .explain-bar.neutral, .explain-bar.unknown, .explain-waterfall-bar.neutral { background: var(--explain-neutral); }
+.explain-bars { list-style: none; padding: 0; margin: 12px 0 0; }
+.explain-feature-row { width: 100%; display: grid; grid-template-columns: minmax(140px, 32%) minmax(0, 1fr) 102px; gap: 12px; align-items: center; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--text); font: inherit; text-align: left; padding: 10px 4px; cursor: pointer; border-radius: 4px; }
+.explain-feature-row:hover, .explain-feature-row.selected { background: var(--chip); }
+.explain-feature-label { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+.explain-provenance { display: inline-block; border: 1px solid var(--input-line); border-radius: 4px; padding: 2px 5px; color: var(--text); font-size: 10px; font-weight: 500; line-height: 1.35; }
+.explain-provenance.default, .explain-provenance.imputed { border-style: dashed; background: var(--chip); }
+.explain-bar-track { position: relative; display: block; height: 26px; }
+.explain-zero { position: absolute; top: -10px; bottom: -10px; left: 50%; border-left: 1px solid var(--muted); opacity: .55; }
+.explain-bar { position: absolute; top: 4px; height: 18px; min-width: 2px; border-radius: 3px; border: 1px solid rgb(20 46 68 / 20%); }
+.explain-contribution { display: flex; flex-direction: column; gap: 4px; text-align: right; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.explain-contribution > span { font-weight: 400; font-size: 10px; color: var(--muted); }
+.explain-axis { display: grid; grid-template-columns: minmax(140px, 32%) minmax(0, 1fr) 102px; gap: 12px; padding: 0 4px; margin-top: 9px; font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.explain-axis-ticks { grid-column: 2; display: flex; justify-content: space-between; padding: 0 4%; }
+.explain-axis-title { text-align: center; font-size: 11px; color: var(--muted); margin: 8px 0 0; }
+.explain-chart-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 14px 0; }
+.explainability button:not(.explain-feature-row) { background: var(--chip); color: var(--text-strong); border: 1px solid var(--input-line); border-radius: 6px; padding: 8px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.explainability button:focus-visible, .explainability summary:focus-visible { outline: 3px solid var(--blue-d); outline-offset: 3px; }
+.explain-feature-details { padding: 14px; margin: 0 4px 10px; border-left: 3px solid var(--blue-d); background: var(--chip); border-radius: 0 0 8px 8px; font-size: 12px; }
+.explain-detail-heading { display: flex; align-items: flex-start; gap: 12px; justify-content: space-between; }
+.explain-detail-heading h5 { margin: 4px 0 0; font-size: 14px; color: var(--text-strong); }
+.explain-detail-heading button { flex: none; }
+.explain-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 12px 0; }
+.explain-feature-details p:last-child { margin-bottom: 0; }
+.explain-disclosure { border-top: 1px solid var(--line); padding: 14px 0; font-size: 12px; }
+.explain-disclosure summary { font-size: 13px; }
+.explain-disclosure[open] summary { margin-bottom: 12px; }
+.explain-model-id code { overflow-wrap: anywhere; }
+.explain-limitations { padding-left: 18px; line-height: 1.7; }
+.explain-waterfall { list-style: none; margin: 16px 0; padding: 0; }
+.explain-waterfall li { display: grid; grid-template-columns: minmax(140px, 32%) minmax(0, 1fr) 120px; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.explain-waterfall-label { overflow-wrap: anywhere; font-size: 11px; }
+.explain-waterfall-track { position: relative; display: block; height: 22px; }
+.explain-waterfall-bar { position: absolute; top: 2px; height: 18px; min-width: 2px; border-radius: 2px; }
+.explain-waterfall-bar.total { background: var(--blue-d); }
+.explain-waterfall-marker { position: absolute; top: -8px; bottom: -8px; border-left: 1px dashed var(--muted); }
+.explain-waterfall-value { text-align: right; font-size: 10px; font-variant-numeric: tabular-nums; }
+.explain-waterfall-value span { display: block; }
+.explain-waterfall-value b { font-size: 12px; }
+.explain-safety { border-top: 1px solid var(--line); padding-top: 14px; margin: 0; font-size: 11px; color: var(--muted); }
+.explain-message { padding: 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--chip); font-size: 12px; }
+@media (max-width: 640px) {
+  .explain-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
+  .explain-feature-row { grid-template-columns: minmax(0, 1fr) 96px; gap: 6px; padding: 12px 2px; }
+  .explain-feature-label { grid-column: 1 / -1; flex-direction: row; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .explain-bar-track { grid-column: 1; }
+  .explain-contribution { grid-column: 2; }
+  .explain-axis { grid-template-columns: minmax(0, 1fr) 96px; gap: 6px; padding: 0 2px; }
+  .explain-axis-ticks { grid-column: 1; }
+  .explain-waterfall li { grid-template-columns: minmax(0, 1fr) 100px; gap: 6px; }
+  .explain-waterfall-label { grid-column: 1 / -1; }
+  .explain-waterfall-track { margin: 8px 2px; }
+  .explain-legend { display: grid; }
+  .explain-detail-heading { flex-wrap: wrap; }
+}

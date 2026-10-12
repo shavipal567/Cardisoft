@@ -2,8 +2,11 @@
 
 File: `dataset/dataset.csv` — extension of the Z-Alizadeh Sani CAD dataset
 (UCI). **303 rows × 59 columns, zero missing values.** Companion notes:
-`dataset/columns.metadata.md` (per-column stats), `analysis.ipynb` (early,
-superseded EDA).
+`dataset/columns.metadata.md` (raw-column dictionary),
+`dataset/statistical-analysis-of-cad-dataset.ipynb` (statistical analysis) and
+`dataset/engineered-feature-analysis.ipynb` (executed feature experiment).
+`dataset/README.md` is the file/reproduction guide. The root `analysis.ipynb`
+is early EDA and does not define the current training pipeline.
 
 ## Column groups (59 total)
 
@@ -21,6 +24,23 @@ superseded EDA).
 | ECG | 7 | Q Wave, St Elevation, St Depression, Tinversion, LVH, Poor R Progression, BBB |
 | Labs | 14 | FBS, CR, TG, LDL, HDL, BUN, ESR, HB, K, Na, WBC, Lymph, Neut, PLT |
 | Echo | 3 | EF-TTE, Region RWMA, VHD |
+
+## Engineered features and analysis files
+
+The source CSV remains 59 columns. Engineered features are calculated from its
+54 allowed inputs by `training/preprocessing.py`; generated columns are not
+added to the CSV or accepted as API fields. Ratios and counts are added to
+model inputs, while the log set replaces TG, FBS and ESR with their `log1p`
+values. See [Feature engineering](feature-engineering.md) for formulas.
+
+The notebook exports plots, descriptive/association tables, complete-repeat
+CV metrics, out-of-fold probabilities and a deterministic derived-feature
+CSV under `dataset/engineered_feature_analysis/`. Its exploration helper
+`dataset/engineered_features_analysis.py` preserves the experiment; active
+training and serving share the production transformer instead. Target
+comparisons use only the appropriate 242-row development partition. The
+[evaluation page](evaluation.md#engineered-feature-comparison) separates these
+results from the historical serving metrics.
 
 ## Target balance
 
@@ -80,6 +100,7 @@ Full per-column metadata (types, ranges, means, modes, descriptions) is in
 `dataset/columns.metadata.md`. Each column documents:
 - Type and value range observed in the dataset
 - Clinical description
-- Preprocessing applied
+- Suggested preprocessing considerations (the implemented policy is documented
+  in [Preprocessing](preprocessing.md))
 - Importance rating
 - Known issues (outliers, sparsity, collinearity)

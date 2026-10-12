@@ -3,7 +3,7 @@
 Status: **implemented**. `frontend/src/components/HeartViewer.tsx` (registered GLB
 heart + surface-fitted LAD/LCX/RCA tube meshes, R3F) is mounted in `frontend/src/App.tsx` and
 implements the binding contract from PROBLEM.md §§12–18 against the
-already-stable API. It renders below the risk cards after `/predict`, with vessel
+already-stable API. It renders below the risk cards and accuracy panel after `/predict`, with vessel
 click-to-select synced to the risk/explanation target.
 
 ## Required capabilities
@@ -30,7 +30,8 @@ layer as interpretive context in the UI copy.
 
 ## API surface consumed by the frontend
 
-- `POST /predict` → `{cad, vessels{LAD,LCX,RCA}}` with probabilities.
+- `POST /predict` → `{cad, vessels{LAD,LCX,RCA}, context}` with probabilities,
+  effective/defaulted inputs, model identities and `context.input_validation`.
 - `POST /explain` with `{features, target: cad|lad|lcx|rca, top_k}` →
   contributions for the selected vessel's panel.
 - `GET /health` → status + disclaimer text.
@@ -39,6 +40,36 @@ layer as interpretive context in the UI copy.
 Live mode is the default. Explicit demo mode uses labelled fixed fixtures.
 The full-width grouped form sits above results; the heart and explanation
 each occupy a full-width row, with the explanation below the heart at all screen sizes.
+
+## Accuracy panel
+
+`InputAccuracy.tsx` appears below the four prediction cards in both patient and
+clinician views. It shows supplied/defaulted counts, coverage, and four cards
+with measured test accuracy, correct counts, 95% intervals, recall, all-input
+accuracy and the always-guess baseline. The cards stack on mobile.
+
+Scores use the [same available fields on held-out cohort records](evaluation.md#accuracy-with-available-inputs),
+not the patient's probability or a percentage derived from field count. Empty
+submissions show a defaults-only warning. Form edits retain the submitted
+assessment's scores with a reanalysis notice; demo or unavailable validation
+displays an explicit message. PDF reports preserve the assessment's measured
+accuracy, intervals, recall and full-input comparison. These cohort scores do
+not alter vessel colours, which continue to represent prediction probabilities.
+
+## Importing report measurements
+
+Both views accept text PDFs and PNG, JPEG, WebP or BMP images through
+**Import measurements from a report**. Image OCR runs in the browser with
+Tesseract.js; the app serves its own worker, WebAssembly and English language
+data. No report file is uploaded. Recognised values fill matching inputs with
+Imported badges for review before analysis. Unmatched fields retain their values.
+
+The importer shows progress, supports cancellation, and rejects empty,
+unsupported or oversized files. Resetting an assessment prevents a pending import
+from repopulating it. OCR targets printed English reports; unclear text and
+complex layouts may require manual entry. The existing field mapper covers 19
+fields and performs no unit conversion. Image-only PDFs must be exported as
+individual images first. See the frontend README for limits and deployment details.
 
 ## Coronary surface registration
 
@@ -72,6 +103,22 @@ review all four views whenever the asset or landmarks change.
 The viewer renders on demand. Labels are occluded by the model, camera presets
 identify the viewing direction, and patient-side labels reverse in posterior
 view. Keyboard-accessible table buttons remain available for hidden arteries.
+
+The viewer opens the nine large exposed vessel ends using the `OPENINGS` array
+in `frontend/src/anatomy/vesselLumens.ts`: three aortic branches, the pulmonary
+artery outlet, superior and inferior vena cava, the upper venous side branch,
+and two pulmonary veins. Small coronary surface vessels are left intact.
+Asset-specific cut planes remove the caps, preserve the surrounding texture
+coordinates, and join the cut edges to rounded rims and inward-facing walls
+with open deep ends. Curved linings follow the vessel interiors. In Original
+colours mode the pulmonary artery and systemic veins retain blue linings,
+while aortic branches and pulmonary veins use red linings. Both appearance
+modes and the opacity control include the linings. This is an illustrative geometry
+repair, not a reconstruction of internal valves or chambers. The cached GLB
+and coronary registration remain unchanged; each viewer owns and disposes its
+replacement geometry. `tests/major-vessels.test.mjs` checks the actual asset for
+open lumens, continuous rims, inward-facing walls, preserved exterior and
+coronary surface geometry, and cache isolation.
 
 ## Coronary visibility
 

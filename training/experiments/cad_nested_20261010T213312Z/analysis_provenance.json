@@ -1,0 +1,10 @@
+{
+  "generated_utc": "2026-10-10T21:55:01.935721+00:00",
+  "source_sha256": {
+    "evaluation_plots.py": "2f6757a6f8e27f2ce99ca1ac549b6bdef154870e16ebe9406772557e7daecd33",
+    "experiment_report.py": "560b20980d1a95cd3e1bd2d8a282c09c01999985686d1ad9c56325c346b335a8",
+    "clinical_metrics.py": "98747f907f2a2feccc380276e6c2983d0c9aa1dba3d6be30b16881793b550ffb"
+  },
+  "outer_predictions_sha256": "da950d4b98c8aa5457e6fe0f55e5a2904cd9575e1970e9e2314d79d717fd673f",
+  "note": "Postprocessing only; does not change model fitting or selection"
+}

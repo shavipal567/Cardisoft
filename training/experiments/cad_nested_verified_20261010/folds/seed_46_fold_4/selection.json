@@ -1,0 +1,17 @@
+{
+  "candidate": "leaf_and_sampling",
+  "params": {
+    "depth": 4,
+    "learning_rate": 0.03,
+    "l2_leaf_reg": 10,
+    "grow_policy": "Depthwise",
+    "min_data_in_leaf": 15,
+    "bootstrap_type": "Bernoulli",
+    "subsample": 0.8,
+    "rsm": 0.8
+  },
+  "iterations": 214,
+  "inner_validation_log_loss": 0.31984527401909896,
+  "baseline_inner_validation_log_loss": 0.3794778390250535,
+  "criterion": "Minimum mean unweighted inner-validation log loss; ties: fewer iterations, name"
+}

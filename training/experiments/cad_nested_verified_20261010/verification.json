@@ -1,0 +1,17 @@
+{
+  "status": "passed",
+  "outer_folds": 50,
+  "outer_prediction_rows": 14520,
+  "unique_development_rows": 242,
+  "checks": [
+    "all split boundaries and calibration subfold isolation",
+    "one outer prediction per row/repeat/model variant",
+    "selected-count OOF probabilities match independent fixed-count refits",
+    "all reported outer metrics match saved predictions",
+    "frozen pipeline and preprocessor/model match held-out saved probabilities",
+    "input column reordering preserves predictions",
+    "saved model tree count and threshold match metadata",
+    "serving CAD artifacts and dataset unchanged",
+    "50-fold baseline reproduces historical CV AUC/F1/AP/Brier exactly"
+  ]
+}

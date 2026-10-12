@@ -71,6 +71,7 @@ nav:
   - Multimodal Fusion: multimodal-fusion.md
   - Models: models.md
   - Evaluation: evaluation.md
+  - CAD Nested Validation: cad-nested-validation.md
   - Explainability: explainability.md
   - Visualization: visualization.md
   - API: api.md

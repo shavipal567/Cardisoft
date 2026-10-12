@@ -3,7 +3,7 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Cell, ResponsiveContainer, ReferenceLine } from "recharts";
 import { predict, explain, getInputDefaults, DEMO_MODE } from "./api";
 import type { PredictResponse, ExplainResponse, Target, Patient, Pred, InputValues } from "./api";
-import { FIELDS, GROUPS, SAMPLE, TARGETS, TARGET_LABELS, riskColor, fieldError, buildPayload, fieldValueLabel } from "./fields";
+import { FIELDS, GROUPS, SAMPLE, TARGETS, TARGET_LABELS, riskColor, fieldError, buildPayload } from "./fields";
 import { PLAIN_LABEL, band, bandClass } from "./plain";
 import Logo from "./components/Logo";
 import { FIELD_INFO } from "./fieldInfo";
@@ -12,10 +12,12 @@ import type { InputSource } from "./components/FieldStatus";
 import LoadingStatus from "./components/LoadingStatus";
 import FieldInfo from "./components/FieldInfo";
 import InputCompleteness from "./components/InputCompleteness";
+import InputAccuracy from "./components/InputAccuracy";
 import AssessmentTools from "./components/AssessmentTools";
 import type { Assessment } from "./assessment";
 import ModelInfo from "./components/ModelInfo";
 import PatientSummary from "./components/PatientSummary";
+import ExplainabilityCard from "./components/ExplainabilityCard";
 import CarePlan from "./components/CarePlan";
 import ReadAloud from "./components/ReadAloud";
 import VoiceInput from "./components/VoiceInput";
@@ -23,12 +25,15 @@ import { buildScript } from "./speech/script";
 import type { SectionId } from "./speech/script";
 import type { Parsed } from "./speech/parse";
 import { extractPdfText } from "./pdf/extractText";
+import { extractReport, REPORT_ACCEPT } from "./import/report";
 import { parsePatientFromText } from "./pdf/fieldMap";
 import type { PdfHit } from "./pdf/fieldMap";
 import HeartViewer from "./components/HeartViewer";
+import { formatModelProbability } from "./anatomy/stenosis";
 import "./App.css";
 import "./features.css";
 import "./audio.css";
+import "./explanation.css";
 
 const NEUTRAL = 0.005; // |contribution| below this is shown as neutral
 
@@ -50,13 +55,13 @@ function Percent({ value }: { value: number }) {
     let raf = 0;
     const tick = (t: number) => {
       const k = Math.min((t - start) / 700, 1);
-      setN(Math.round(value * (1 - Math.pow(1 - k, 3))));
+      setN(value * (1 - Math.pow(1 - k, 3)));
       if (k < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [value]);
-  return <>{n}%</>;
+  return <>{formatModelProbability(n)}</>;
 }
 
 function ThemeIcon({ dark }: { dark: boolean }) {
@@ -115,6 +120,15 @@ export default function App() {
   const [pdfError, setPdfError] = useState("");
   const [reading, setReading] = useState<SectionId | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  const [reportParsing, setReportParsing] = useState(false);
+  const [reportFileName, setReportFileName] = useState("");
+  const [reportHits, setReportHits] = useState<PdfHit[]>([]);
+  const [reportSkipped, setReportSkipped] = useState<{ key: string; reason: string }[]>([]);
+  const [reportError, setReportError] = useState("");
+  const [reportProgress, setReportProgress] = useState("");
+  const importController = useRef<AbortController | null>(null);
+
+  useEffect(() => () => { importController.current?.abort(); }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,7 +202,7 @@ export default function App() {
 
   function loadSample() {
     setSources(Object.fromEntries(Object.keys(SAMPLE).map((key) => [key, "Sample"])));
-    setError(""); setResetNotice(""); setPdfFileName(""); setPdfHits([]); setPdfSkipped([]); setPdfError("");
+    setError(""); setResetNotice(""); setReportFileName(""); setReportHits([]); setReportSkipped([]); setReportError("");
     setValues(SAMPLE);
     setGender("Male");
     setName("Sample patient");
@@ -208,10 +222,12 @@ export default function App() {
 
   function resetAssessment() {
     taskEpoch.current += 1;
+    importController.current?.abort();
+    importController.current = null;
     setValues({}); setSources({}); setName(""); setGender(""); setFieldSearch(""); setOpenGroups([GROUPS[0].title]);
     setResult(null); setAnalyzed(null); setAnalyzedName(""); setAssessment(null); setComparisonBaseline(null);
     setExplanations({}); setExplainErrors({}); setTarget("CAD"); setError(""); setLoading(false);
-    setPdfParsing(false); setPdfFileName(""); setPdfHits([]); setPdfSkipped([]); setPdfError("");
+    setReportParsing(false); setReportFileName(""); setReportHits([]); setReportSkipped([]); setReportError("");
     setResetNotice("New assessment started. Patient details, imports, results and comparison have been cleared.");
     setReading(null); setAnnouncement("New assessment started.");
     requestAnimationFrame(() => { jumpTo(inputRef.current); document.getElementById("patient-name")?.focus({ preventScroll: true }); });
@@ -254,23 +270,40 @@ export default function App() {
     }
   }
 
-  async function onPdfFile(file: File | undefined) {
+  function cancelImport() {
+    importController.current?.abort();
+    importController.current = null;
+    setReportParsing(false);
+    setReportFileName("");
+    setReportError("");
+  }
+
+  async function onReportFile(file: File | undefined) {
     if (!file) return;
     const epoch = taskEpoch.current;
-    setPdfParsing(true);
-    setPdfError("");
-    setPdfHits([]);
-    setPdfSkipped([]);
-    setPdfFileName(file.name);
+    importController.current?.abort();
+    const controller = new AbortController();
+    importController.current = controller;
+    const isCurrent = () => epoch === taskEpoch.current && importController.current === controller && !controller.signal.aborted;
+    setReportParsing(true);
+    setReportProgress("Opening report…");
+    setReportError("");
+    setReportHits([]);
+    setReportSkipped([]);
+    setReportFileName(file.name);
     try {
-      const buf = await file.arrayBuffer();
-      const { text, pages, truncated } = await extractPdfText(buf);
+      const { text, pages, truncated, kind } = await extractReport(file, {
+        signal: controller.signal,
+        onProgress: (message) => { if (isCurrent()) setReportProgress(message); },
+      });
       const parsed = parsePatientFromText(text);
-      if (epoch !== taskEpoch.current) return;
+      if (!isCurrent()) return;
       if (parsed.hits.length === 0) {
-        setPdfError(`No recognizable values found in ${pages} page(s). Enter values manually.`);
-        setPdfHits([]);
-        setPdfSkipped([]);
+        setReportError(kind === "image"
+          ? "Text was read, but no supported measurements were recognized. Try a clearer image or enter values manually."
+          : `No recognizable values found in ${pages} page(s). Enter values manually.`);
+        setReportHits([]);
+        setReportSkipped([]);
         return;
       }
       setValues((p) => ({ ...p, ...parsed.values }));
@@ -279,18 +312,21 @@ export default function App() {
         const importedGender = parsed.values.Sex === 1 ? "Male" : "Female";
         setGender((previous) => previous === "Others" ? previous : importedGender);
       }
-      setPdfHits(parsed.hits);
-      setPdfSkipped([
+      setReportHits(parsed.hits);
+      setReportSkipped([
         ...parsed.skipped.map((s) => ({ key: s.key, reason: s.reason })),
-        ...(truncated ? [{ key: "PDF", reason: `only first ${pages} pages scanned` }] : []),
+        ...(truncated ? [{ key: "PDF", reason: "report reached the page or text limit; some content was not read" }] : []),
       ]);
     } catch (e) {
-      if (epoch !== taskEpoch.current) return;
-      setPdfError((e as Error).message);
-      setPdfHits([]);
-      setPdfSkipped([]);
+      if (!isCurrent()) return;
+      setReportError(e instanceof Error ? e.message : "The report could not be read. Try another file.");
+      setReportHits([]);
+      setReportSkipped([]);
     } finally {
-      if (epoch === taskEpoch.current) setPdfParsing(false);
+      if (isCurrent()) {
+        importController.current = null;
+        setReportParsing(false);
+      }
     }
   }
 
@@ -335,10 +371,10 @@ export default function App() {
     ? [...expl.features]
         .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
         .slice(0, 8)
-         .map((f) => ({ ...f, label: f.assumed ? `${f.name} (default)` : f.name }))
+        .map((f) => ({ ...f, label: f.assumed ? `${f.name} (default)` : f.name }))
     : [];
   const selected = predOf(target);
-  
+
 
   const axis = dark ? "#93a7bd" : "#7b8da1";
 
@@ -422,7 +458,7 @@ export default function App() {
               <div className="form-tools">
                 {result && <button className="btn soft" onClick={jumpToResults}>View results ↓</button>}
                 <button className="btn soft" onClick={resetAssessment}>Start new assessment</button>
-                <button className="btn soft" onClick={loadSample} disabled={pdfParsing}>Load sample patient</button>
+                <button className="btn soft" onClick={loadSample} disabled={reportParsing}>Load sample patient</button>
               </div>
             </div>
 
@@ -430,48 +466,50 @@ export default function App() {
 
             {clinician && (
           <details className="pdf-box">
-            <summary>Import measurements from a lab PDF <span>Optional</span></summary>
+            <summary>Import measurements from a report <span>PDF or image · Optional</span></summary>
             <div className="pdf-content">
-            <label className="btn soft pdf-btn" aria-busy={pdfParsing}>
-              {pdfParsing ? "Reading PDF..." : "📄 Scan lab PDF"}
+            <label className="btn soft pdf-btn" aria-busy={reportParsing}>
+              {reportParsing ? "Reading report…" : "Choose PDF or image"}
               <input
                 type="file"
-                accept="application/pdf,.pdf"
+                accept={REPORT_ACCEPT}
                 className="pdf-input"
-                aria-label="Scan lab PDF"
-                disabled={pdfParsing}
+                aria-label="Import PDF or report image"
+                disabled={reportParsing}
                 onChange={(e) => {
-                  void onPdfFile(e.target.files?.[0]);
+                  void onReportFile(e.target.files?.[0]);
                   e.target.value = "";
                 }}
               />
             </label>
-            <p className="note">Text PDFs only. Parsing runs in your browser — no file is uploaded. Verify values against the original before Analyze.</p>
-            {pdfFileName && !pdfError && pdfHits.length > 0 && (
-              <p className="note pdf-ok">
-                {pdfFileName}: filled {pdfHits.length} field{pdfHits.length === 1 ? "" : "s"} — review below, then press Analyze.
+            {reportParsing && <button className="btn soft" onClick={cancelImport}>Cancel import</button>}
+            <p className="note">Choose a text PDF or a PNG, JPEG, WebP or BMP image (up to 15 MB). Use a clear, upright image of printed English text. Files are read in your browser.</p>
+            <p className="note">Recognized measurements fill matching fields and may replace existing values. Review them against the original report before Analyze.</p>
+            {reportFileName && !reportError && reportHits.length > 0 && (
+              <p className="note pdf-ok" role="status">
+                {reportFileName}: filled {reportHits.length} field{reportHits.length === 1 ? "" : "s"} — review below, then press Analyze.
               </p>
             )}
-            {pdfError && <p className="error">{pdfError}</p>}
-            {pdfHits.length > 0 && (
+            {reportError && <p className="error" role="alert">{reportError}</p>}
+            {reportHits.length > 0 && (
               <ul className="pdf-hits">
-                {pdfHits.map((h) => (
-                  <li key={h.key}>
+                {reportHits.map((h) => (
+                  <li key={h.key} title={h.snippet}>
                     <b>{h.key}</b> = {h.value}
                     <span className={"conf " + h.confidence}>{h.confidence}</span>
                   </li>
                 ))}
               </ul>
             )}
-            {pdfSkipped.length > 0 && (
-              <p className="note">Skipped: {pdfSkipped.map((s) => `${s.key} (${s.reason})`).join("; ")}</p>
+            {reportSkipped.length > 0 && (
+              <p className="note">Skipped: {reportSkipped.map((s) => `${s.key} (${s.reason})`).join("; ")}</p>
             )}
             </div>
           </details>
             )}
 
             {resetNotice && <p className="results-update" role="status">{resetNotice}</p>}
-            {pdfParsing && <LoadingStatus label="Reading lab PDF…" detail="Extracting measurements locally. You can review the imported values before analyzing." />}
+            {reportParsing && <LoadingStatus label={reportProgress} detail="Extracting measurements locally. Review imported values before analyzing." />}
             <div className="field-search-bar">
               <label htmlFor="field-search">Find an input</label>
               <input id="field-search" type="search" value={fieldSearch} placeholder="Search name or abbreviation, e.g. LDL" onChange={(event) => setFieldSearch(event.target.value)} />
@@ -479,7 +517,7 @@ export default function App() {
               <button className="btn soft" disabled={Boolean(query)} onClick={() => setOpenGroups(GROUPS.map((group) => group.title))}>Expand all</button>
               <button className="btn soft" disabled={Boolean(query)} onClick={() => setOpenGroups([])}>Collapse all</button>
             </div>
-            <p className="note input-source-key">Entered = your input · Imported = from a PDF · Sample = example data · Default = used when blank</p>
+            <p className="note input-source-key">Entered = your input · Imported = from a report · Sample = example data · Default = used when blank</p>
             {query && <p className="note" role="status">{matchingCount} model inputs match “{fieldSearch}”.</p>}
             <div className="form-sections">
             {GROUPS.map((g, groupIndex) => {
@@ -614,7 +652,7 @@ export default function App() {
                 <progress value={completedFields} max={FIELDS.length} aria-label="Measurement completion" />
                 <span>Optional fields can be left blank.</span>
               </div>
-              <button className="btn primary" onClick={analyze} disabled={loading || pdfParsing}>
+              <button className="btn primary" onClick={analyze} disabled={loading || reportParsing}>
                 {loading ? "Analyzing..." : "Analyze patient"}
               </button>
               {error && <p className="error" role="alert">{error}</p>}
@@ -654,7 +692,7 @@ export default function App() {
                 <div className={"risk-grid" + (reading === "summary" || reading === "vessels" ? " reading" : "")}>
                   {TARGETS.map((t, i) => {
                     const p = predOf(t)!;
-                    const pct = Math.round(p.probability * 100);
+                    const pct = p.probability * 100;
                     return (
                       <button
                         type="button"
@@ -666,7 +704,7 @@ export default function App() {
                       >
                         <div className="risk-name">{clinician ? TARGET_LABELS[t] : PLAIN_LABEL[t]}</div>
                         <div className="pct">
-                          <Percent value={pct} />
+                          <Percent value={p.probability} />
                         </div>
                         <div className="meter">
                           <span style={{ width: `${pct}%`, background: riskColor(p.probability) }} />
@@ -692,11 +730,14 @@ export default function App() {
                   })}
                 </div>
 
+                {assessment && <InputAccuracy assessment={assessment} outdated={Boolean(resultsOutdated)} />}
+
                 <div className="results-detail-grid">
                 <div id="heart-anatomy" ref={anatomyRef} tabIndex={-1} className="heart-result">
                   <HeartViewer ref={heartViewer}
                     probabilities={probabilities}
                     classifications={classifications}
+                    vesselFindings={result.vessel_findings}
                     cadProbability={result.cad.probability}
                     cadPrediction={result.cad.prediction}
                     selected={target}
@@ -709,54 +750,13 @@ export default function App() {
                   {!clinician && selected ? (
                     <PatientSummary target={target} pred={selected} expl={expl} loading={explainLoading} />
                   ) : (
-                    <div className="card">
-                      <h3>What influenced this estimate</h3>
-                      {selected && (
-                        <p style={{ margin: "0 0 8px" }}>
-                          {TARGET_LABELS[target]}: <b>{Math.round(selected.probability * 100)}%</b> model-estimated
-                          probability, model classification{" "}
-                          <span className={"pill " + (selected.prediction === 1 ? "pos" : "neg")}>
-                            {selected.prediction === 1 ? "Positive" : "Negative"}
-                          </span>
-                        </p>
-                      )}
-                      {explainLoading && <LoadingStatus label={`Explaining ${TARGET_LABELS[target]}…`} detail="Calculating which inputs contributed to this estimate." />}
-                      {expl && (
-                        <>
-                          <div style={{ height: 300 }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 10 }}>
-                                <XAxis type="number" stroke={axis} />
-                                <YAxis type="category" dataKey="label" width={150} stroke={axis} />
-                                <Tooltip
-                                  contentStyle={{
-                                    background: dark ? "#1b2d47" : "#fff",
-                                    border: "none",
-                                    borderRadius: 10,
-                                    color: dark ? "#dbe6f2" : "#34495e",
-                                  }}
-                                />
-                                <ReferenceLine x={0} stroke={axis} />
-                                <Bar dataKey="contribution" radius={4}>
-                                  {chartData.map((c, i) => (
-                                    <Cell
-                                      key={i}
-                                      fill={expl.signed === false ? "#8fb8d6" : c.contribution >= 0 ? "#e9657a" : "#6bb6e3"}
-                                    />
-                                  ))}
-                                </Bar>
-                              </BarChart>
-                            </ResponsiveContainer>
-                          </div>
-                          <p className="note">
-                            {expl.signed === false
-                              ? expl.note ??
-                                "These bars show how much the model relies on each input, not whether it raises or lowers the estimate."
-                              : `${expl.note ?? "Illustrative demo contributions."} Base probability ${(expl.base_value * 100).toFixed(1)}%. The chart shows the eight largest contributions; the full table includes all collected measurements.`}
-                          </p>
-                        </>
-                      )}
-                    </div>
+                    selected && <ExplainabilityCard key={`${assessment?.id}-${target}`}
+                      target={target} prediction={selected} explanation={expl} context={result.context}
+                      loading={explainLoading} error={explainError} demo={DEMO_MODE}
+                      onRetry={() => {
+                        setExplanations(previous => { const next = { ...previous }; delete next[target]; return next; });
+                        setExplainErrors(previous => { const next = { ...previous }; delete next[target]; return next; });
+                      }} />
                   )}
                 </div>
 
@@ -769,54 +769,7 @@ export default function App() {
 
                 {analyzed && <CarePlan patient={analyzed} result={result} clinician={clinician} />}
 
-                {clinician && (
-                  <details className="card">
-                    <summary>Patient values and how the model used them ({target})</summary>
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Measurement</th>
-                          <th>Value used</th>
-                          <th>Model contribution</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {FIELDS.map((f) => {
-                          const v = analyzed?.[f.key];
-                          const c = expl?.features.find((x) => x.name === f.key)?.contribution;
-                          const shown =
-                            v === undefined ? `Not provided — default: ${expl?.features.find((x) => x.name === f.key)?.value ?? "pending"}` : fieldValueLabel(f.key, v);
-                          let label = "n/a";
-                          let cls = "";
-                          if (c !== undefined && expl?.signed === false) {
-                            label = `Importance ${(c * 100).toFixed(0)}%`;
-                          } else if (c !== undefined) {
-                            if (c > NEUTRAL) { label = `▲ Positive (+${c.toFixed(2)})`; cls = "up"; }
-                            else if (c < -NEUTRAL) { label = `▼ Negative (${c.toFixed(2)})`; cls = "down"; }
-                            else { label = "● Neutral"; }
-                          }
-                          return (
-                            <tr key={f.key}>
-                              <td>{f.label}</td>
-                              <td>
-  {shown}
-  {expl?.features.some(
-    (x) => x.name === f.key && x.assumed
-  ) && (
-    <span title="This feature was supplied automatically rather than collected through the form">
-      {" "}(auto-supplied)
-    </span>
-  )}
-</td>
-                              <td className={cls}>{label}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                    <p className="note">"n/a" means this feature was not among the explanation values returned.</p>
-                  </details>
-                )}
+
               </>
             )}
           </section>

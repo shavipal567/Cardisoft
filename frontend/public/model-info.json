@@ -29,7 +29,7 @@
       "cv_roc_auc": 0.9272527472527472,
       "cv_roc_auc_std": 0.030092000124652952,
       "repeats": 10,
-      "training_git_hash": "7e57a80"
+      "training_git_hash": "23f1f17"
     },
     "LAD": {
       "target": "lad",
@@ -51,7 +51,7 @@
       "cv_roc_auc": 0.842816678395496,
       "cv_roc_auc_std": 0.058009876027055964,
       "repeats": 10,
-      "training_git_hash": "7e57a80"
+      "training_git_hash": "23f1f17"
     },
     "LCX": {
       "target": "lcx",
@@ -73,7 +73,7 @@
       "cv_roc_auc": 0.7400060496067755,
       "cv_roc_auc_std": 0.06012295862123018,
       "repeats": 10,
-      "training_git_hash": "7e57a80"
+      "training_git_hash": "23f1f17"
     },
     "RCA": {
       "target": "rca",
@@ -95,7 +95,7 @@
       "cv_roc_auc": 0.7066548449977992,
       "cv_roc_auc_std": 0.0675257056378401,
       "repeats": 10,
-      "training_git_hash": "7e57a80"
+      "training_git_hash": "23f1f17"
     }
   }
 }

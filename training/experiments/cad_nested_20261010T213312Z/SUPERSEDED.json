@@ -1,0 +1,5 @@
+{
+  "reason": "Implementation verification found CatBoost longer-fit prefixes differ from true fixed-count refits. This pilot is superseded; do not use it as the final fixed-count comparison.",
+  "replacement": "training/experiments/cad_nested_verified_20261010",
+  "selection_changes": "Each candidate count now gets explicit inner fits. No changes to prespecified candidates, seeds, objective, threshold or calibration methods."
+}

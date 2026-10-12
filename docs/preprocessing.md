@@ -1,104 +1,141 @@
 # Preprocessing
 
-`training/preprocessing.py` defines the input allow-list and two preprocessing
-tracks shared by training and frozen inference. 59 source columns become 54
-inputs after removing LAD/LCX/RCA/Cath and constant Exertional CP.
+`training/preprocessing.py` defines the raw input allow-list, feature formulas and
+three preprocessing tracks. Training fits these transforms; inference loads and
+applies the saved preprocessor. A change to training defaults never changes an
+already fitted model's inputs.
 
-## Cleaning (`clean_dataframe()`)
+## Raw inputs and cleaning
 
-Idempotent, applied identically at training and inference:
+The source CSV contains 59 columns. Excluding `Cath`, `LAD`, `LCX`, `RCA` and
+constant `Exertional CP` leaves **54 permitted raw inputs**:
 
-1. **Sex normalization**: `Fmale` → `Female` (dataset typo affecting 127 rows)
-2. **Region RWMA**: integer codes → strings so the encoder treats them as
-   categorical (the anatomical mapping of codes 0–4 is undocumented)
+- 33 numeric fields, including binary flags.
+- 17 Y/N categorical fields.
+- Four nominal fields: Sex, BBB, VHD and Region RWMA.
 
-No other cleaning is applied. Outliers are reviewed but never blind-dropped.
-No derived ratios, log transforms, or outlier capping are shipped.
+`split_features_target()` cleans the data and applies this allow-list. Extra
+columns, target labels and patient IDs cannot become model inputs through it.
+Patient IDs, when supplied to the nested protocol, are used only for splitting.
+
+`clean_dataframe()` normalises `Fmale` to `Female` and converts Region RWMA codes
+to strings. The code's anatomical mapping is undocumented, so it is not treated
+as an invented severity scale. No automatic outlier clipping is performed.
+
+## Transformation order
+
+```text
+Raw fields → cleaning → numeric branch: feature engineering → median imputation → RobustScaler
+                     → categorical branch: mode imputation → one-hot or integer encoding
+                     → concatenated model inputs
+```
+
+`NumericFeatureEngineer` computes row-wise values inside the numeric branch.
+For count sets, that branch also receives raw DLP to form the risk-factor count;
+DLP remains in the categorical branch as an original input. Generated columns
+are not added to the raw API schema.
+
+Ratios/counts retain their component fields. Log variants replace TG, FBS and ESR
+with their log1p values. Missing/nonfinite operands propagate; ratio denominators
+must be positive; logs require nonnegative labs; counts require every binary
+constituent. Derived values are imputed only after calculation. Engineered numeric
+branches preserve completely missing outputs so their positions remain stable.
+
+See [feature engineering](feature-engineering.md) for exact formulas and the
+exploratory evidence behind the defaults.
+
+## Feature sets and dimensions
+
+`train.py --feature-set auto` resolves to CAD `logs`, LAD `counts`, LCX
+`ratios_counts`, and RCA `baseline`. An explicit set overrides the policy for
+all requested targets. Low-level builder functions default to `baseline`.
+
+| Feature set | Numeric outputs | Native outputs | One-hot outputs with full dataset vocabulary |
+|---|---:|---:|---:|
+| `baseline` | 33 | 54 | 81 |
+| `ratios` | 36 | 57 | 84 |
+| `counts` | 35 | 56 | 83 |
+| `logs` | 33 | 54 | 81 |
+| `ratios_counts` | 38 | 59 | 86 |
+| `ratios_counts_logs` | 38 | 59 | 86 |
+
+One-hot counts depend on the levels observed during fitting and can be smaller
+inside a fold. Read `get_feature_names_out()` or `feature_schema.json` rather than
+assuming a fixed width. The current saved models are baseline artifacts: 54
+native columns for CAD and 81 one-hot columns for each vessel.
 
 ## Three preprocessing tracks
 
-| Track | Numerical inputs (33) | Categorical inputs (21) | Saved output |
-|---|---|---|---|
-| One-hot (vessel winners) | Median imputation, RobustScaler | Mode imputation, one-hot, unknown ignored | 81 columns |
-| Native (CAD winner) | Median imputation, RobustScaler | Mode imputation, ordinal codes, unknown −1 | 54 columns |
-| Voting (voting ensemble) | Median imputation, RobustScaler | Mode imputation, one-hot, unknown ignored | 81 columns + StandardScaler(with_mean=False) |
+### One-hot track
 
-### One-hot track (RF/XGB/HGB/Stack)
+`build_preprocessor(feature_set="baseline")` serves RF, XGBoost,
+HistGradientBoosting and stacking. Numeric outputs receive median imputation
+and robust scaling. Categoricals receive mode imputation and
+`OneHotEncoder(handle_unknown="ignore", sparse_output=False)`. An unseen category
+therefore has an all-zero block at inference.
 
-Used by the saved vessel models (LAD, LCX, RCA). Produces 81 transformed columns:
+### Native track
 
-- 33 numerical columns (Age, Weight, binaries, labs, EF-TTE)
-- 48 one-hot columns from 21 categorical inputs:
-  - 15 Y/N flags → 1 column each (15)
-  - Sex → 2 columns (Male, Female)
-  - BBB → 3 columns (N, LBBB, RBBB)
-  - VHD → 4 columns (N, mild, Moderate, Severe)
-  - Region RWMA → 5 columns (0, 1, 2, 3, 4)
+`build_native_preprocessor(feature_set="baseline")` serves LightGBM and CatBoost.
+Numeric handling is the same as above. Mode-imputed categorical values become
+integer codes through `OrdinalEncoder`; unseen levels map to −1. Missing inputs
+normally receive the fitted mode before encoding.
 
-`handle_unknown="ignore"` makes inference robust to unseen categories —
-unknown values produce an all-zeros one-hot row rather than raising an error.
+Output order is numeric columns followed by the 21 categorical columns.
+`native_cat_indices(feature_set)` computes the categorical positions from
+`numeric_feature_names(feature_set)`. For example, counts shift the starting
+position from 33 to 35; ratios plus counts shift it to 38.
 
-### Native track (LightGBM/CatBoost)
+`CatBoostNative` casts those positions to integer type at fit and prediction.
+`LGBMArrayClassifier` preserves fitted LightGBM feature names when receiving
+NumPy prediction arrays. Neither adapter changes the clinical input schema.
 
-Used by the saved CAD model. Produces 54 transformed columns:
+### Voting track
 
-- 33 numerical columns (same as one-hot track)
-- 21 categorical columns encoded as integer codes via `OrdinalEncoder`
-  - Unknown/missing values → −1
+`build_voting_preprocessor(feature_set="baseline")` applies the one-hot track,
+then `StandardScaler(with_mean=False)` for the ElasticNet member. All voting
+members receive this shared transformed matrix. Their native standalone tracks
+are not used inside the voting ensemble.
 
-Output order is `[NUMERIC_FEATURES..., NATIVE_CAT_FEATURES...]`, so
-`native_cat_indices()` gives the categorical positions passed as
-`categorical_feature` (LGBM) / `cat_features` (CatBoost) at every fit.
+## Fold isolation and persistence
 
-`CatBoostNative` (`native_models.py`) int-casts on the way in at both fit
-and predict time, because CatBoost rejects float matrices with cat features.
-This keeps the saved artifact layout identical (`preprocessor.joblib` +
-`model.joblib`), so `inference.py` and the backend work unchanged.
+Each selection fold fits a fresh preprocessor on its training rows. Stacking
+and voting clone and fit preprocessing again inside their inner OOF folds.
+The nested CAD protocol also isolates inner, calibration and outer folds.
+Final refitting learns statistics only from the development partition.
 
-### Voting track (Voting ensemble)
+The fixed formulas use no labels or cohort statistics. Medians, modes, scaling
+parameters and category vocabularies are learned only during fitting. The
+historical holdout never fits preprocessing. Feature choices informed by earlier
+exploration still limit claims of independent validation.
 
-Used by the voting ensemble. Produces 81 transformed columns (same as one-hot track)
-followed by `StandardScaler(with_mean=False)` for unit variance across all features.
-This conditions the ElasticNet member (L1/L2 regularization is scale-sensitive).
+New training exports record the resolved feature set, generated names and output
+width. `preprocessor.joblib` contains the transformer itself. Inference applies
+that artifact rather than calling a builder with the latest defaults. Old
+artifacts continue to use their original preprocessing.
 
-## Design decisions
+## API defaults and explanations
 
-- **RobustScaler over StandardScaler**: TG/FBS/WBC/PLT/ESR are heavily
-  right-skewed. RobustScaler uses median and IQR, making it less sensitive
-  to outliers than mean/std scaling.
-- **No log-transform**: Recorded as future work (see IMPROVEMENTS.md §5).
-  Tree winners don't need it, but it could help linear models.
-- **Median imputation**: More robust than mean for skewed distributions.
-  Fitted on training data only — the 61 test patients never influence
-  imputation values.
-- **Mode imputation for categoricals**: Most frequent value is the safest
-  default for sparse categorical levels.
+HTTP requests are completed with `PatientInput` defaults before preprocessing.
+An omitted HDL field therefore uses its API default when forming ratios. Direct
+inference with missing measurements can instead invoke fitted imputation.
+These are distinct behaviours; an empty API request is a defaults-only assessment.
 
-## Leakage prevention
+The [input-availability accuracy check](evaluation.md#accuracy-with-available-inputs)
+uses those same raw-field defaults on holdout records and then applies the frozen
+preprocessor. Derived features are recalculated after substitution.
 
-Preprocessors are fitted:
-1. Manually inside each outer CV fold (during model selection)
-2. On the full 242-row training split (for the final saved artifact)
+Engineered-model explanations use a saved raw training background and recompute
+derived values whenever their source inputs change. Baseline models retain
+transformed-space grouping. [Explanation details](explainability.md).
 
-The 61-row test split is never used in fitting. `LEAKAGE_COLUMNS` (LAD, LCX,
-RCA, Cath) are excluded by `split_features_target()` for every target.
-An allow-list (`ALL_INPUT_FEATURES`) ensures stray columns in a future CSV
-are excluded automatically.
+## Output names and code reference
 
-## API defaults vs. fitted imputation
+`get_output_feature_names()` delegates to the fitted preprocessor. Names include
+branch prefixes, for example `num__Age`, `num__log1p_TG`,
+`num__risk_factor_count` and `cat__Sex_Male`. Voting preserves these names
+through its additional scaling step.
+The names describe model columns; `ALL_INPUT_FEATURES` describes the 54 raw fields.
 
-The HTTP API has explicit defaults for omitted measurements (defined in
-`backend/schemas.py`) and validates finite numbers, bounds, and categories
-before preprocessing. An API request containing `{}` differs from a direct
-inference call with missing values: schema defaults and fitted imputation
-are distinct. The frontend collects 19 of 54 fields and identifies
-uncollected explanation features as "defaulted."
-
-## Output feature names
-
-`get_output_feature_names()` returns the transformed column names:
-- One-hot: `Age`, `Weight`, ..., `Sex_Male`, `Sex_Female`, `BBB_N`, ...
-- Native: `Age`, `Weight`, ..., `Sex`, `BBB`, `VHD`, `Region RWMA`, ...
-
-These names are used in explanations to map transformed columns back to
-original clinical inputs.
+See the [training API reference](api-reference/training.md) for signatures,
+feature-set resolution and artifact metadata.

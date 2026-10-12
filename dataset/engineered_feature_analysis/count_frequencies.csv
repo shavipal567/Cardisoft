@@ -1,0 +1,10 @@
+count,records,feature
+0.0,31,risk_factor_count
+1.0,89,risk_factor_count
+2.0,71,risk_factor_count
+3.0,45,risk_factor_count
+4.0,6,risk_factor_count
+0.0,142,ecg_finding_count
+1.0,59,ecg_finding_count
+2.0,39,ecg_finding_count
+3.0,2,ecg_finding_count

@@ -1,0 +1,70 @@
+{
+  "dataset_sha256": "dfe06e123151f995437c60a77f8bfa9ddf68848958b2ea2b7a6eb60c42971af0",
+  "analysis_sha256": "c51dd23214488ccc3ddcebab3e4fd879f1bb6b0a6010c26a266bb1c840ccc99e",
+  "raw_rows": 303,
+  "raw_columns": 59,
+  "original_predictors": 54,
+  "derived_features": [
+    "LDL_HDL_ratio",
+    "TG_HDL_ratio",
+    "Neut_Lymph_ratio",
+    "risk_factor_count",
+    "ecg_finding_count",
+    "log1p_TG",
+    "log1p_FBS",
+    "log1p_ESR"
+  ],
+  "excluded_target_columns": [
+    "LAD",
+    "LCX",
+    "RCA",
+    "Cath"
+  ],
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "folds": 5,
+  "holdout": "Per-target stratified 20%, seed 42; excluded from association and model analysis",
+  "variants": [
+    "baseline",
+    "ratios",
+    "counts",
+    "logs",
+    "ratios_counts",
+    "ratios_counts_logs"
+  ],
+  "log_policy": "Replace TG/FBS/ESR in log variants",
+  "threshold": 0.5,
+  "primary_comparison": "unweighted log_loss; also inspect AUC and Brier",
+  "cv_role": "exploratory fixed-configuration comparison, not nested feature selection",
+  "uncertainty": "SD across 3 correlated OOF repeats is descriptive, not a confidence interval",
+  "cad_model": {
+    "family": "CatBoostNative",
+    "iterations": 400,
+    "depth": 4,
+    "learning_rate": 0.05,
+    "l2_leaf_reg": 3,
+    "auto_class_weights": "Balanced"
+  },
+  "vessel_models": {
+    "family": "RandomForestClassifier",
+    "n_estimators": 400,
+    "min_samples_leaf": 2,
+    "class_weight": "balanced",
+    "max_depth": {
+      "lad": null,
+      "lcx": null,
+      "rca": 8
+    }
+  },
+  "packages": {
+    "numpy": "1.26.4",
+    "pandas": "2.2.3",
+    "scipy": "1.14.1",
+    "scikit-learn": "1.7.2",
+    "catboost": "1.2.10",
+    "matplotlib": "3.7.5"
+  }
+}

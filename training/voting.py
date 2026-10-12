@@ -1,3 +1,10 @@
+"""Soft voting with out-of-fold weight and threshold selection for binary labels.
+
+Members share preprocessing fitted separately inside each tuning fold.
+The fitted ensemble receives the final transformed matrix and returns
+two-column probabilities in class order [0, 1], matching saved-model inference.
+"""
+
 import itertools
 
 import numpy as np
@@ -5,14 +12,20 @@ from sklearn.base import clone
 from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, fbeta_score, recall_score
-from sklearn.model_selection import StratifiedKFold, cross_val_predict
 from xgboost import XGBClassifier
 
+from ensemble_cv import out_of_fold_probabilities
 from native_models import CatBoostNative, LGBMArrayClassifier
-from preprocessing import native_cat_indices
 
 
 class VotingClassifier:
+    """Weighted binary probabilities with a configurable decision threshold.
+
+    ``predict_proba`` returns rows [P(0), P(1)]; ``predict`` thresholds column 1.
+    Feature importances average normalised member importances, skipping
+    members without usable values. This importance average is unweighted.
+    """
+
     def __init__(self, estimators, weights=None, threshold=0.5):
         self.estimators = estimators
         self.weights = weights
@@ -95,15 +108,13 @@ def build_voting_estimators(scale_pos, random_state=42):
     ]
 
 
-def optimize_voting_weights_and_threshold(estimators, X, y, cv=5, seed=42):
-    X = np.asarray(X, dtype=float)
+def optimize_voting_weights_and_threshold(estimators, X, y, cv=5, seed=42,
+                                         *, preprocessor=None):
+    """Tune on OOF predictions; pass raw X and a preprocessor for learned transforms."""
     y = np.asarray(y, dtype=int)
-    skf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=seed)
-    oof = np.zeros((len(y), len(estimators)))
-    for j, (_, est) in enumerate(estimators):
-        oof[:, j] = cross_val_predict(
-            clone(est), X, y, cv=skf, method="predict_proba",
-        )[:, 1]
+    oof = out_of_fold_probabilities(
+        estimators, X, y, cv=cv, seed=seed, preprocessor=preprocessor,
+    )
 
     individual_f2 = []
     for j in range(len(estimators)):

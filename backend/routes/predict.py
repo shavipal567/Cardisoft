@@ -4,6 +4,8 @@ from schemas import PatientInput
 from services.predictor import available, predict_patient
 from inference import get_artifact, TARGET_KEYS
 from model_info import MODEL_NAMES
+from services.input_validation import input_validation
+from services.explanation_context import input_context
 
 router = APIRouter()
 
@@ -18,8 +20,8 @@ def predict(patient: PatientInput):
         supplied = {field.alias or key for key, field in PatientInput.model_fields.items()
                     if key in patient.model_fields_set}
         result["context"] = {
-            "effective_inputs": features,
-            "defaulted_inputs": [key for key in features if key not in supplied],
+            **input_context(patient),
+            "input_validation": input_validation(supplied),
             "models": {key.upper(): {
                 "name": MODEL_NAMES.get(get_artifact(key)["model_kind"], type(get_artifact(key)["model"]).__name__),
                 "version": get_artifact(key)["version"],

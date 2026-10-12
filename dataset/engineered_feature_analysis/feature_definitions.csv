@@ -1,0 +1,9 @@
+feature,formula,source_columns,type,interpretation
+LDL_HDL_ratio,LDL / HDL,LDL; HDL,ratio,Relative lipid levels
+TG_HDL_ratio,TG / HDL,TG; HDL,ratio,Relative lipid levels
+Neut_Lymph_ratio,Neut / Lymph,Neut; Lymph,ratio,White-cell differential balance
+risk_factor_count,DM + HTN + Current Smoker + FH + 1[DLP == Y],DM; HTN; Current Smoker; FH; DLP,count 0–5,Unweighted count; not a validated clinical score
+ecg_finding_count,Q Wave + St Elevation + St Depression + Tinversion,Q Wave; St Elevation; St Depression; Tinversion,count 0–4,Four recorded ECG findings; not interchangeable diagnoses
+log1p_TG,ln(1 + TG),TG,log transform,Compresses the right tail; adds no new measurement
+log1p_FBS,ln(1 + FBS),FBS,log transform,Compresses the right tail; adds no new measurement
+log1p_ESR,ln(1 + ESR),ESR,log transform,Compresses the right tail; adds no new measurement

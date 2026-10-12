@@ -14,6 +14,7 @@ errors): [API](../api.md). Explainability design:
 | `routes/explain.py` | `POST /explain` endpoint | `explain()` |
 | `routes/model_info.py` | `GET /model-info`, `GET /input-defaults` | `get_model_info()`, `get_input_defaults()` |
 | `services/predictor.py` | Thin re-export of training/inference | `available()`, `predict_patient()` |
+| `services/input_validation.py` | Frozen-model accuracy with the submitted fields available | `input_validation()`, `wilson_interval()` |
 | `services/explainer.py` | Permutation Shapley implementation | `explain_patient()`, `permutation_contributions()`, `feature_groups()` |
 
 ## main.py
@@ -86,22 +87,41 @@ Returns service status, artifact availability, supported targets, and the medica
 **Behavior:**
 1. Checks `available()` — returns 503 if artifacts missing
 2. Calls `predict_patient()` with the feature dict
-3. Builds `context` with `effective_inputs`, `defaulted_inputs`, and model identities
-4. Returns the prediction result
+3. Identifies supplied fields from `PatientInput.model_fields_set`, using CSV aliases
+4. Calls `input_validation()` with that field set, independently of patient values
+5. Builds `context` with `effective_inputs`, `defaulted_inputs`, `input_validation`, and model identities
+6. Returns the prediction result
 
 **Error handling:**
 - 503: Model artifacts not found
 - 422: Inference failed (with error detail)
+- Validation dataset/metadata failure: prediction can succeed with `input_validation.status = "unavailable"`
 
-**Response context:**
-```json
+**Response context (abbreviated, with comments marking omitted entries):**
+
+```jsonc
 {
   "context": {
-    "effective_inputs": {"Age": 66, "DM": 1, ...},
-    "defaulted_inputs": ["Weight", "Length", ...],
+    "effective_inputs": {
+      "Age": 66, "DM": 1
+      // All 54 effective values are returned.
+    },
+    "defaulted_inputs": [
+      "Weight", "Length"
+      // All omitted input keys are returned.
+    ],
+    "input_validation": {
+      "supplied_count": 2,
+      "total_features": 54,
+      "status": "available",
+      "method": "held_out_default_substitution",
+      "targets": {
+        // CAD, LAD, LCX and RCA contain the metrics documented in API.
+      }
+    },
     "models": {
-      "CAD": {"name": "CatBoost", "version": "sha256:abc123...", "training_revision": "def456"},
-      "LAD": {"name": "Random Forest", "version": "sha256:...", "training_revision": "def456"}
+      "CAD": {"name": "CatBoost", "version": "<64-character SHA-256 hex digest>", "training_revision": "<saved revision>"}
+      // LAD, LCX and RCA identities omitted.
     }
   }
 }
@@ -158,6 +178,48 @@ from inference import available, predict_patient
 This ensures there is exactly one implementation of cleaning, transformation,
 and thresholding — the backend and training share the same code path.
 
+## services/input_validation.py
+
+### `input_validation(supplied: set[str]) -> dict`
+
+Accepts supplied CSV feature names, not patient values. Restricts them to the
+54 input allow-list and uses the current `PatientInput` defaults. For each target
+it reconstructs the stratified holdout from cached artifact metadata, retains the
+supplied columns' recorded values and defaults the remainder. Frozen inference
+and the saved threshold produce classifications for comparison with known labels.
+
+Returns counts plus `status: available`, method `held_out_default_substitution`,
+and the four target metric objects. See the
+[field definitions and unavailable response](../api.md#accuracy-with-available-inputs).
+The current cohort has 61 test rows per target. The service computes all-input
+accuracy on that same cohort for comparison; no fitting or writes to artifacts occur.
+
+On missing resources or validation failure, logs the error and returns counts,
+`status: unavailable`, and a generic `reason`. `method` and `targets` are omitted.
+This failure does not prevent the route from returning patient predictions.
+
+### Resources, identity and caching
+
+- CSV: fixed repository path `dataset/dataset.csv`, preserving the original row order.
+- Metadata: `csv_column`, `positive_label`, `random_state`, `test_size`, `n_train`,
+  and `n_test` from the loaded artifact's `metadata` dictionary.
+- Checks: label definitions, reconstructed split sizes, model version and threshold.
+- Caches: one dataset revision, eight target/cohort entries, and 128 field-set results.
+- Result cache keys: supplied fields, defaults, model versions, thresholds, split
+  metadata, and dataset path/modification time/file size.
+
+The dataset revision is a cache key, not a training-time content fingerprint.
+The implementation cannot certify cohort identity from label definitions and
+row counts alone. Alternate `ARTIFACTS_DIR` bundles must be compatible with the
+same CSV. Restart after replacing cached model artifacts.
+
+### `wilson_interval(correct: int, total: int) -> dict`
+
+Returns `{low, high}` for the 95% Wilson interval, using `z = 1.959963984540054`.
+The service calls it with a positive test sample count. Limits describe sampling
+uncertainty in cohort accuracy, not individual prediction confidence. See
+[the evaluation method](../evaluation.md#accuracy-with-available-inputs).
+
 ## services/explainer.py
 
 ### Constants
@@ -170,9 +232,19 @@ SEED = 42                 # reproducible sampling
 
 ### `feature_groups(names: list[str]) -> dict[str, list[int]]`
 
-Maps transformed column names to whole original features. One-hot columns are grouped back to their source categorical input.
+Maps transformed names to original inputs for the baseline explanation path,
+grouping all one-hot columns of a field. It also recognises single-source
+`log1p_` names. Multi-source ratios/counts are not assigned to one arbitrary
+source; `explain_patient()` uses raw-input permutations for any engineered set.
 
 Example: `["Sex_Male", "Sex_Female"]` → `{"Sex": [0, 1]}`
+
+### `RawPredictionModel(preprocessor, model)`
+
+Probability adapter for engineered explanations. Converts raw object arrays
+into a 54-column DataFrame, applies `clean_dataframe()` and the frozen
+preprocessor, then calls the classifier. Every permutation step recalculates
+all derived features consistently with the changed raw fields.
 
 ### `permutation_contributions(model, x, background, groups) -> (base, probability, contributions)`
 
@@ -192,13 +264,18 @@ Returns:
 
 Full explanation pipeline:
 
-1. Load the target's frozen model
-2. Transform the patient's features
-3. Load and sample the background
-4. Compute feature groups
-5. Run `permutation_contributions()`
-6. Select top-k by absolute contribution
-7. Build the response dict with additivity contract
+1. Load the target's frozen preprocessor/model and inspect transformed names.
+2. If generated names are present, load `shap_raw_background.joblib` and use
+   `RawPredictionModel` with singleton groups for the 54 raw fields.
+3. Otherwise, load `shap_background.npz` and group transformed columns by input.
+4. Sample up to 16 reference rows with seed 42.
+5. Run `permutation_contributions()` with eight paths per reference.
+6. Select top-k by absolute contribution; sum omitted contributions as the residual.
+7. Return probability-space contributions with raw field names and values.
+
+A missing raw background raises `ValueError`; the route reports an explanation
+failure as HTTP 422. It does not substitute a transformed background for an
+engineered model. Cached backgrounds and models require a restart when replaced.
 
 **Response fields:**
 
@@ -215,7 +292,10 @@ Full explanation pipeline:
 | `permutations_per_background` | int | `ORDER_PAIRS * 2` = 8 |
 | `remaining_contribution` | float | Sum of omitted contributions |
 | `note` | str | Method description and limitations |
-| `features` | list[dict] | Top-k features with values and contributions |
+| `features` | list[dict] | `name`, `value`, `raw_value`, `contribution` for each selected raw field |
+
+The route adds `model_version`. The frontend derives default badges from the
+assessment context; the explanation response does not have a `defaulted` field.
 
 ## Auto-generated API (mkdocstrings)
 
@@ -224,6 +304,8 @@ Full explanation pipeline:
 ::: backend.schemas
 
 ::: backend.services.predictor
+
+::: backend.services.input_validation
 
 ::: backend.services.explainer
 
