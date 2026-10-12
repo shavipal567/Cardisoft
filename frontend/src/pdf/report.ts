@@ -1,8 +1,4 @@
-<<<<<<< Updated upstream
-
-=======
 import { featureMeta, featureValue, formatContribution, formatOutput, PROVENANCE, statusOf } from "../explanation";
->>>>>>> Stashed changes
 import { jsPDF } from "jspdf";
 import type { Target } from "../api";
 import { TARGETS, TARGET_LABELS, FIELDS } from "../fields";
@@ -14,9 +10,16 @@ import {
   probabilityChange,
 } from "../assessment";
 import type { Assessment, Explanations } from "../assessment";
-<<<<<<< Updated upstream
 
 type ExportErrors = Partial<Record<Target, string>>;
+
+// The built-in PDF font needs plain equivalents for typographic symbols.
+const withoutControls = (value: string) => Array.from(value, char =>
+  char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127 ? " " : char).join("");
+const clean = (value: unknown) => withoutControls(String(value ?? "Unavailable"))
+  .replace(/[–—−]/g, "-")
+  .replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/→/g, "->")
+  .replace(/µ/g, "u").replace(/³/g, "^3");
 
 const PAGE_W = 210;
 const M = 15;
@@ -50,7 +53,6 @@ export async function createAssessmentPdf(
   });
 
   let y = 0;
-  let page = 0;
 
   const setText = (
     color: [number, number, number],
@@ -102,34 +104,8 @@ function drawPageHeader() {
 
   function newPage() {
     doc.addPage();
-    page++;
     drawPageHeader();
     y = 34;
-=======
-import { changedInputs, completeness, displayInput, predictionOf, probabilityChange } from "../assessment";
-import { FIELDS, TARGETS } from "../fields";
-
-const withoutControls = (value: string) => Array.from(value, (char) =>
-  char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127 ? " " : char).join("");
-
-const clean = (value: unknown) => withoutControls(String(value ?? "Unavailable")).replace(/[–—−]/g, "-")
-  .replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/→/g, "->")
-  .replace(/µ/g, "u").replace(/³/g, "^3");
-
-export async function createAssessmentPdf(current: Assessment, explanations: Explanations,
-  explanationErrors: Partial<Record<Target, string>>, baseline: Assessment | null = null, heartImage?: HTMLCanvasElement) {
-  const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
-  doc.setProperties({ title: "Cardisoft assessment report", author: "Cardisoft", subject: "Research model assessment" });
-  const left = 16, width = 178, bottom = 278;
-  let y = 20;
-  const newPage = () => { doc.addPage(); y = 20; };
-  const ensure = (height: number) => { if (y + height > bottom) newPage(); };
-  function paragraph(value: string, size = 10) {
-    doc.setFont("helvetica", "normal"); doc.setFontSize(size); doc.setTextColor(39, 56, 73);
-    const lines: string[] = doc.splitTextToSize(clean(value), width);
-    for (const line of lines) { ensure(5); doc.text(line, left, y); y += 5; }
-    y += 3;
->>>>>>> Stashed changes
   }
 
   function ensureSpace(height: number) {
@@ -169,8 +145,9 @@ function section(title: string, subtitle?: string) {
 }
 
   function paragraph(text: string, indent = 0, fontSize = 9) {
+    setText(C.ink, fontSize);
     const lines = doc.splitTextToSize(
-      String(text || "Not available"),
+      clean(text || "Not available"),
       W - indent,
     ) as string[];
 
@@ -189,11 +166,12 @@ function estimateTableHeight(
 ) {
   const headerHeight = 9;
   const lineHeight = fontSize * 0.48;
+  setText(C.navy, fontSize);
 
   const rowsHeight = rows.reduce((total, row) => {
     const wrapped = row.map((value, i) =>
       doc.splitTextToSize(
-        String(value ?? "—"),
+        clean(value ?? "—"),
         Math.max(8, widths[i] - 5),
       ) as string[],
     );
@@ -227,11 +205,10 @@ function estimateTableHeight(
     doc.text(title.toUpperCase(), x + 4, top + 6);
 
     setText(C.navy, 11, true);
-    const lines = doc.splitTextToSize(value, width - 8) as string[];
+    const lines = doc.splitTextToSize(clean(value), width - 8) as string[];
     doc.text(lines.slice(0, 2), x + 4, top + 13);
   }
 
-<<<<<<< Updated upstream
   function table(
   headers: string[],
   rows: string[][],
@@ -242,28 +219,19 @@ function estimateTableHeight(
   const cellPadding = 4;
   const lineHeight = fontSize * 0.48;
 
-  // Calculate the height of every row before drawing anything.
-  const rowHeights = rows.map((row) => {
-    const wrapped = row.map((value, i) =>
+  // Measure at the same font size used to render the cells.
+  setText(C.navy, fontSize);
+  const wrappedRows = rows.map((row) => row.map((value, i) =>
       doc.splitTextToSize(
-        String(value ?? "—"),
+        clean(value ?? "—"),
         Math.max(8, widths[i] - 5),
       ) as string[],
-    );
-
-    return Math.max(
+  ));
+  const rowHeights = wrappedRows.map((wrapped) => Math.max(
       8,
       ...wrapped.map((lines) => lines.length * lineHeight + cellPadding),
-    );
-  });
-
-  const totalTableHeight =
-  headerHeight + rowHeights.reduce((sum, height) => sum + height, 0);
-
-
-if (y + totalTableHeight > BOTTOM) {
-  newPage();
-}
+  ));
+  ensureSpace(headerHeight + (rowHeights[0] ?? 0));
 
   // Draw the table header.
   const drawHeader = () => {
@@ -283,16 +251,13 @@ if (y + totalTableHeight > BOTTOM) {
 
   drawHeader();
 
-  // Draw all rows together on this page.
-  rows.forEach((row, rowIndex) => {
-    const wrapped = row.map((value, i) =>
-      doc.splitTextToSize(
-        String(value ?? "—"),
-        Math.max(8, widths[i] - 5),
-      ) as string[],
-    );
-
+  // Long tables continue on a new page with their column headings repeated.
+  wrappedRows.forEach((wrapped, rowIndex) => {
     const rowHeight = rowHeights[rowIndex];
+    if (y + rowHeight > BOTTOM) {
+      newPage();
+      drawHeader();
+    }
 
     if (rowIndex % 2 === 0) {
       doc.setFillColor(248, 250, 252);
@@ -318,7 +283,6 @@ if (y + totalTableHeight > BOTTOM) {
 }
 
   // jsPDF already creates page 1. Draw its header without adding a page.
-page = 1;
 drawPageHeader();
 y = 34;
 
@@ -440,8 +404,24 @@ table(
   );
 
 
-  // Patient input details
-  
+  const validation = snapshot.result.context?.input_validation;
+  if (!snapshot.demo && validation?.status === "available") {
+    section("Test accuracy with available inputs");
+    paragraph("Held-out test records retain the same supplied fields; omitted fields use the same defaults. These exploratory cohort scores are not the chance that this patient's prediction is correct.", 0, 9);
+    if (complete.supplied.length === 0) paragraph("No patient measurements were supplied. Predictions use defaults only and are not personalized.");
+    const pc = (value: number) => `${(value * 100).toFixed(1)}%`;
+    table(["Target", "Test accuracy", "95% interval", "Recall", "All inputs"], TARGETS.map((target) => {
+      const score = validation.targets[target];
+      return [target, `${pc(score.accuracy)} (${score.correct}/${score.n_test})`,
+        `${pc(score.accuracy_interval.low)} - ${pc(score.accuracy_interval.high)}`,
+        score.recall === null ? "N/A" : pc(score.recall), pc(score.full_input_accuracy)];
+    }), [20, 43, 48, 30, 37]);
+    paragraph("95% Wilson intervals reflect sampling uncertainty on a small, single-source test set. Accuracy depends on which inputs are available, not just their count. More inputs do not guarantee a higher score.", 0, 9);
+  } else {
+    paragraph(snapshot.demo ? "Accuracy for these inputs was not evaluated in demo mode."
+      : "Accuracy for these inputs is unavailable; input coverage is not an accuracy estimate.", 0, 9);
+  }
+
   // Patient input details
   const inputRows = FIELDS.map((field) => {
     const entered = snapshot.inputs[field.key] !== undefined;
@@ -473,6 +453,17 @@ section("Patient information", "Values supplied to the assessment");
 table(inputHeaders, inputRows, inputWidths, 7.5);
 
 
+  section("Model identity");
+  if (snapshot.demo) paragraph("Demo fixtures. No fitted model was invoked for these predictions.");
+  else if (snapshot.result.context) {
+    paragraph("Artifact version is SHA-256 of the loaded preprocessor and model bytes. Training revision identifies the recorded training code revision.", 0, 9);
+    table(["Target / model", "Artifact version / training revision"], TARGETS.map((target) => {
+      const model = snapshot.result.context!.models?.[target];
+      return [`${target}: ${model?.name ?? "Model unavailable"}`, model ? `${model.version}\nTraining: ${model.training_revision}` : "Identifier unavailable"];
+    }), [58, 120]);
+  } else paragraph("Model identity unavailable from this server response.");
+
+
   // Detailed model explanations
   section("Feature explanations", "Factors reported by the prediction models");
 
@@ -482,53 +473,10 @@ table(inputHeaders, inputRows, inputWidths, 7.5);
     8,
   );
 
-=======
-  const { supplied, missing, percent } = completeness(current.inputs);
-  heading("Input completeness");
-  paragraph(`${supplied.length} of ${FIELDS.length} inputs supplied (${percent}%); ${missing.length} defaulted.`);
-  const validation = current.result.context?.input_validation;
-  if (!current.demo && validation?.status === "available") {
-    heading("Test accuracy with available inputs");
-    paragraph("Held-out test records retain the same supplied fields; omitted fields use the same defaults. These exploratory cohort scores are not the chance that this patient's prediction is correct.", 9);
-    if (supplied.length === 0) paragraph("No patient measurements were supplied. Predictions use defaults only and are not personalized.");
-    const pc = (value: number) => `${(value * 100).toFixed(1)}%`;
-    table(["Target", "Test accuracy", "95% interval", "Recall", "All inputs"], TARGETS.map((target) => {
-      const score = validation.targets[target];
-      return [target, `${pc(score.accuracy)} (${score.correct}/${score.n_test})`,
-        `${pc(score.accuracy_interval.low)} - ${pc(score.accuracy_interval.high)}`,
-        score.recall === null ? "N/A" : pc(score.recall), pc(score.full_input_accuracy)];
-    }), [20, 43, 48, 30, 37]);
-    paragraph("95% Wilson intervals reflect sampling uncertainty on a small, single-source test set. Accuracy depends on which inputs are available, not just their count. More inputs do not guarantee a higher score.", 9);
-  } else {
-    paragraph(current.demo ? "Accuracy for these inputs was not evaluated in demo mode."
-      : "Accuracy for these inputs is unavailable; input coverage is not an accuracy estimate.", 9);
-  }
-  heading("Inputs used");
-  if (current.demo) paragraph("Demo inputs are recorded for review only; no patient-specific inference was performed.");
-  else if (!current.result.context) paragraph("The server did not return effective inputs or model versions. Default values and artifact identity are unavailable for this snapshot.");
-  table(["Input", "Value used", "Source"], FIELDS.map((field) => [field.label,
-    displayInput(field.key, current.inputs, current.demo ? undefined : current.result.context?.effective_inputs),
-    current.inputs[field.key] === undefined ? "Preset default" : "Supplied",
-  ]), [85, 58, 35]);
-
-  heading("Model identity");
-  if (current.demo) paragraph("Demo fixtures. No fitted model was invoked for these predictions.");
-  else if (current.result.context) {
-    paragraph("Artifact version is SHA-256 of the loaded preprocessor and model bytes. Training revision identifies the recorded training code revision.", 9);
-    table(["Target / model", "Artifact version / training revision"], TARGETS.map((target) => {
-      const model = current.result.context!.models?.[target];
-      return [`${target}: ${model?.name ?? "Model unavailable"}`, model ? `${model.version}\nTraining: ${model.training_revision}` : "Identifier unavailable"];
-    }), [58, 120]);
-  } else paragraph("Model identity unavailable from this server response.");
-
-  heading("What influenced the estimates");
-  paragraph("Top contributions for each target are shown below. Positive contributions raise the model estimate; negative contributions lower it relative to the explanation baseline. These are model associations, not causal effects. Values marked defaulted are not measured patient inputs.", 9);
->>>>>>> Stashed changes
   for (const target of TARGETS) {
     ensureSpace(18);
 
     const explanation = explanations[target];
-<<<<<<< Updated upstream
 
     if (!explanation) {
       paragraph(
@@ -552,69 +500,30 @@ table(inputHeaders, inputRows, inputWidths, 7.5);
       );
     }
 
+    paragraph(
+      `Baseline model output: ${formatOutput(explanation.base_value, explanation.output_space)}.`,
+      0,
+      8,
+    );
     const features = [...explanation.features]
-      .filter((feature) => !feature.assumed)
-      .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));
+      .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
+      .slice(0, 10);
 
     if (!features.length) {
-      paragraph("No supplied-input feature contributions were available.");
+      paragraph("No feature contributions were available.");
     } else {
-      
-const featureHeaders = [
-  "Feature",
-  "Value",
-  "Interpretation",
-  "Contribution",
-];
-
-const featureRows = features.map((feature) => {
-  const direction =
-    explanation.signed === false
-      ? "Importance only"
-      : feature.contribution > 0
-        ? "Increased model output"
-        : feature.contribution < 0
-          ? "Decreased model output"
-          : "No directional contribution";
-
-  return [
-    feature.name,
-    String(feature.value),
-    direction,
-    feature.contribution.toFixed(4),
-  ];
-});
-
-const featureWidths = [43, 33, 72, 32];
-
-ensureSpace(
-  20 + estimateTableHeight(featureRows, featureWidths, 7) + 4,
-);
-section(TARGET_LABELS[target]);
-
-table(featureHeaders, featureRows, featureWidths, 7);
-
+      const featureHeaders = ["Input", "Value used / source", explanation.signed === false ? "Importance" : "Contribution"];
+      const featureRows = features.map((feature) => [
+        featureMeta(feature.name).label,
+        `${featureValue(feature)}${feature.value !== null && featureMeta(feature.name).unit ? ` ${featureMeta(feature.name).unit}` : ""} (${PROVENANCE[statusOf(feature)].label})`,
+        formatContribution(feature.contribution, explanation.output_space),
+      ]);
+      const featureWidths = [80, 57, 43];
+      ensureSpace(35);
+      section(TARGET_LABELS[target]);
+      table(featureHeaders, featureRows, featureWidths, 7);
     }
 
-    const assumedCount = explanation.features.filter((f) => f.assumed).length;
-    if (assumedCount > 0) {
-      paragraph(
-        `${assumedCount} assumed or default-based feature contribution(s) were excluded from the supplied-input table.`,
-        0,
-        8,
-      );
-    }
-=======
-    if (!explanation) { paragraph(explanationErrors[target] ?? "Explanation unavailable."); continue; }
-    paragraph(`${current.demo ? "Illustrative demo" : explanation.method ?? "Method unavailable"}; baseline model output ${formatOutput(explanation.base_value, explanation.output_space)}.`, 9);
-    if (explanation.note) paragraph(explanation.note, 8);
-    const features = [...explanation.features].sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution)).slice(0, 10);
-    table(["Input", "Value used / source", explanation.signed === false ? "Importance" : "Contribution"], features.map((feature) => [
-      featureMeta(feature.name).label,
-      `${featureValue(feature)}${feature.value !== null && featureMeta(feature.name).unit ? ` ${featureMeta(feature.name).unit}` : ""} (${PROVENANCE[statusOf(feature)].label})`,
-      formatContribution(feature.contribution, explanation.output_space),
-    ]), [80, 57, 41]);
->>>>>>> Stashed changes
   }
 
   // Optional comparison

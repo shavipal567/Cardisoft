@@ -11,16 +11,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .reading { outline: 3px solid var(--accent); outline-offset: 5px; border-radius: 22px; }
 
 .listen-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 14px; padding: 12px 16px; }
-.listen-bar label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.listen-bar label { font-size: var(--text-small); color: var(--muted); display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
 .listen-bar select {
   padding: 5px 8px; border-radius: 10px; border: 1px solid var(--input-line);
-  background: var(--input); color: var(--text); max-width: 230px;
+  background: var(--input); color: var(--text); max-width: min(230px, 100%); min-width: 0; font-size: var(--text-small);
 }
 .listen-now { flex-basis: 100%; margin: 0; font-size: 13px; color: var(--muted); }
-.btn.small { width: auto; padding: 8px 14px; margin: 0; }
+.btn.small { width: auto; padding: 8px 14px; margin: 0; font-size: var(--text-body); }
 
-.voice { margin-bottom: 16px; border: 1px dashed var(--input-line); border-radius: 14px; padding: 10px 12px; }
-.voice summary { cursor: pointer; font-weight: 800; color: var(--text-strong); }
+.accordion { margin-bottom: 16px; border: 1px dashed var(--input-line); border-radius: 14px; padding: 10px 12px; }
+.accordion summary { cursor: pointer; font-size: var(--text-body); font-weight: 700; line-height: 1.5; color: var(--text-strong); }
 .voice textarea {
   width: 100%; margin-top: 3px; padding: 8px 10px; border-radius: 10px; resize: vertical;
   border: 1px solid var(--input-line); background: var(--input); color: var(--text); font: inherit;

@@ -102,7 +102,7 @@ export default function VoiceInput(props: { onApply: (p: Parsed) => void }) {
   }
 
   return (
-    <details className="voice">
+    <details className="voice accordion">
       <summary> 🎙️ Speak or type the details</summary>
       <p className="note">
         Try: "age 58, blood pressure 140, diabetes yes, smoker no, LDL 130". Nothing is filled in until you confirm.

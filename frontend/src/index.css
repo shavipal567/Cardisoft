@@ -2,6 +2,17 @@
 
 :root {
   color-scheme: light;
+  /* Shared type scale: compact metadata, readable controls, and clear headings. */
+  --text-caption: 0.75rem;
+  --text-small: 0.8125rem;
+  --text-body: 0.875rem;
+  --text-lead: 1rem;
+  --text-card-title: 1.125rem;
+  --text-section-title: 1.25rem;
+  --text-metric: clamp(1.875rem, 2.5vw, 2rem);
+  --text-primary-metric: clamp(2.25rem, 3.5vw, 3rem);
+  --leading-heading: 1.3;
+  --leading-copy: 1.6;
   --bg1: #f3f7fa;
   --text: #34495e; --text-strong: #2a4660; --muted: #6d8aa3; --line: #d3e4f0;
   --card: #ffffff;
@@ -61,6 +72,7 @@ h1, h2, h3, h4 {
   font-family: inherit;
   color: var(--text-strong);
   letter-spacing: normal;
+  line-height: var(--leading-heading);
 }
 
-input, button { font: inherit; }
+input, button, select, textarea { font: inherit; }
