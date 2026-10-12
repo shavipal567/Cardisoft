@@ -19,8 +19,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .listen-now { flex-basis: 100%; margin: 0; font-size: 13px; color: var(--muted); }
 .btn.small { width: auto; padding: 8px 14px; margin: 0; }
 
-.voice { margin-bottom: 16px; border: 1px dashed var(--input-line); border-radius: 14px; padding: 10px 12px; }
-.voice summary { cursor: pointer; font-weight: 800; color: var(--text-strong); }
+.accordion { margin-bottom: 16px; border: 1px dashed var(--input-line); border-radius: 14px; padding: 10px 12px; }
+.accordion summary { cursor: pointer; font-weight: 800; color: var(--text-strong); }
 .voice textarea {
   width: 100%; margin-top: 3px; padding: 8px 10px; border-radius: 10px; resize: vertical;
   border: 1px solid var(--input-line); background: var(--input); color: var(--text); font: inherit;

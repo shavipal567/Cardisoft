@@ -465,7 +465,7 @@ export default function App() {
             <VoiceInput onApply={applyParsed} />
 
             {clinician && (
-          <details className="pdf-box">
+          <details className="pdf-box accordion">
             <summary>Import measurements from a report <span>PDF or image · Optional</span></summary>
             <div className="pdf-content">
             <label className="btn soft pdf-btn" aria-busy={reportParsing}>
