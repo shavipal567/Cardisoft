@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { ExternalLink, Info } from "lucide-react";
 import { FIELD_INFO } from "../fieldInfo";
+import Icon from "./Icon";
 
 export default function FieldInfo({ fieldKey, label }: { fieldKey: string; label: string }) {
   const [open, setOpen] = useState(false);
@@ -28,14 +30,12 @@ export default function FieldInfo({ fieldKey, label }: { fieldKey: string; label
   const panel = open ? <span ref={panelRef} id={id} className="field-info-panel" role="region" aria-label={`About ${label}`}>
       <button type="button" className="field-info-close" aria-label="Close field information" onClick={() => { setOpen(false); button.current?.focus(); }}>×</button>
       <strong>{label}</strong><span>{info.intro}</span>
-      <a href={`https://www.google.com/search?q=${encodeURIComponent(info.query)}`} target="_blank" rel="noopener noreferrer" aria-label={`Learn more about ${label} on Google (opens in a new tab)`}>Learn more on Google ↗</a>
+      <a href={`https://www.google.com/search?q=${encodeURIComponent(info.query)}`} target="_blank" rel="noopener noreferrer" aria-label={`Learn more about ${label} on Google (opens in a new tab)`}>Learn more on Google <Icon component={ExternalLink} size={14} /></a>
     </span> : null;
   return <span className="field-info" ref={root}>
     <button type="button" className="field-info-button" ref={button} aria-label={`About ${label}`}
       aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" /><path d="M12 11v6" /><circle cx="12" cy="7.5" r=".7" fill="currentColor" />
-      </svg>
+      <Icon component={Info} size={16} />
     </button>
     {mobile && panel ? createPortal(panel, document.body) : panel}
   </span>;

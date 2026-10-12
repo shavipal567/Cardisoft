@@ -1,9 +1,11 @@
 import { useId, useRef, useState } from "react";
+import { BarChart3, BrainCircuit, GitBranch, ShieldAlert } from "lucide-react";
 import type { ExplainResponse, FeatureContribution, Pred, PredictionContext, Target } from "../api";
 import { TARGET_LABELS } from "../fields";
 import { axisLabel, DIRECTION, direction, explanationMatch, featureMeta, featureValue, finite, formatContribution, formatOutput,
   PROVENANCE, provenanceDetail, statusOf, thresholdMargin, waterfall } from "../explanation";
 import LoadingStatus from "./LoadingStatus";
+import Icon from "./Icon";
 
 export function ProvenanceBadge({ feature }: { feature: FeatureContribution }) {
   return <span className={`explain-provenance ${statusOf(feature)}`} title={provenanceDetail(feature)}>{PROVENANCE[statusOf(feature)].label}</span>;
@@ -108,7 +110,7 @@ export default function ExplainabilityCard({ target, prediction, explanation, co
   return <section className="card explainability" aria-labelledby={`${id}-title`} onKeyDown={event => {
     if (event.key === "Escape" && selected) { event.preventDefault(); close(); }
   }}>
-    <h3 id={`${id}-title`}>What influenced this estimate</h3>
+    <h3 id={`${id}-title`}><Icon component={BrainCircuit} size={20} className="icon-gap" />What influenced this estimate</h3>
     <dl className="explain-summary">
       <div><dt>Target</dt><dd>{TARGET_LABELS[target]}</dd></div>
       <div><dt>Estimated probability</dt><dd>{formatOutput(prediction.probability, "probability")}</dd></div>
@@ -118,7 +120,7 @@ export default function ExplainabilityCard({ target, prediction, explanation, co
       {model?.version && <div><dt>{model.name ?? "Model"} · identifier</dt><dd><abbr title={model.version}>{model.version.slice(0, 12)}</abbr></dd></div>}
     </dl>
     {margin !== null && margin !== 0 && formatOutput(prediction.probability, "probability") === formatOutput(prediction.threshold, "probability") && <p className="note">The displayed percentages round to the same value. Classification uses unrounded values.</p>}
-    <div className="explain-chart-heading"><h4>Patient-specific feature contributions</h4><p>See which input features pushed the model’s estimate higher or lower.</p></div>
+    <div className="explain-chart-heading"><h4><Icon component={BarChart3} size={18} className="icon-gap-sm" />Patient-specific feature contributions</h4><p>See which input features pushed the model’s estimate higher or lower.</p></div>
     {demo && <p className="explain-message">Illustrative demo contributions. They are not calculated from this patient's inputs. Provenance and output space are unavailable.</p>}
     {loading && <LoadingStatus label={`Explaining ${TARGET_LABELS[target]}…`} detail="Calculating contributions and checking the prediction context." />}
     {(error || match === "mismatch") && <div className="explain-message" role="alert"><p>{match === "mismatch" ? "Explanation unavailable: the returned inputs, model or probability do not match this prediction. Analyze again to obtain a consistent result." : `Explanation unavailable: ${error}`}</p><button type="button" onClick={onRetry}>Retry explanation</button></div>}
@@ -161,10 +163,10 @@ export default function ExplainabilityCard({ target, prediction, explanation, co
       <div className="explain-chart-footer"><p className="note">Baseline model output: <b>{formatOutput(expl.base_value, expl.output_space)}</b>{expl.approximate ? " · Approximate Shapley values" : ""}</p>
         {ranked.length > 8 && <button type="button" aria-expanded={all} onClick={() => { setAll(!all); setSelection(null); }}>{all ? "Show top 8 features" : `Show all ${ranked.length} features`}</button>}</div>
     </>}
-    <details className="explain-disclosure"><summary>How the estimate was formed</summary>
+    <details className="explain-disclosure"><summary><Icon component={GitBranch} size={16} className="icon-gap-sm" />How the estimate was formed</summary>
       {expl ? <Waterfall explanation={expl} visible={visible} verified={!demo && match === "verified"} /> : <p className="note">Waterfall unavailable until a matching explanation is available.</p>}
     </details>
-    <details className="explain-disclosure"><summary>Model reliability and limitations</summary>
+    <details className="explain-disclosure"><summary><Icon component={ShieldAlert} size={16} className="icon-gap-sm" />Model reliability and limitations</summary>
       <Reliability explanation={demo ? undefined : expl} modelVersion={model?.version} threshold={prediction.threshold} />
     </details>
     <p className="explain-safety">These explanations describe how the model produced its estimate relative to a reference prediction. Feature contributions are not causal effects, do not establish a diagnosis, and are not independent changes in a patient’s clinical risk. Automatically supplied or imputed values may influence the estimate. This research prototype should be interpreted alongside appropriate clinical assessment.</p>

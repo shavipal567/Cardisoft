@@ -16,12 +16,16 @@ const moduleUrl = async (file, imports = {}) => {
   return `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
 };
 const runtime = { react: pathToFileURL(require.resolve('react')).href, 'react/jsx-runtime': pathToFileURL(require.resolve('react/jsx-runtime')).href };
+// Minimal lucide-react stub: icon components render nothing, just enough for JSX rendering in tests.
+const lucideStub = `data:text/javascript;base64,${Buffer.from(`export const BarChart3=()=>null;export const BrainCircuit=()=>null;export const GitBranch=()=>null;export const ShieldAlert=()=>null;`).toString('base64')}`;
+const iconStub = await moduleUrl('../src/components/Icon.tsx', { 'lucide-react': lucideStub, react: runtime.react, 'react/jsx-runtime': runtime['react/jsx-runtime'] });
 const fields = await moduleUrl('../src/fields.ts');
 const helpers = await moduleUrl('../src/explanation.ts', { './fields': fields });
 const { normalizePrediction, normalizePredictionContext, normalizeExplanation, featureMeta, featureValue, formatContribution, formatOutput, thresholdMargin, direction, waterfall, explanationMatch } = await import(helpers);
 const { default: Card, FeatureDetails } = await import(await moduleUrl('../src/components/ExplainabilityCard.tsx', {
   ...runtime, '../fields': fields, '../explanation': helpers,
   './LoadingStatus': await moduleUrl('../src/components/LoadingStatus.tsx', runtime),
+  'lucide-react': lucideStub, './Icon': iconStub,
 }));
 const pred = { probability: .55, prediction: 0, threshold: .65 };
 const context = { models: { RCA: { version: 'model-a', name: 'Fixture model' } }, input_signature: 'patient-a' };

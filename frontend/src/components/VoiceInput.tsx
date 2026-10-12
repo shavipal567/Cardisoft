@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { Mic, Square } from "lucide-react";
 import { FIELDS } from "../fields";
 import { parseSpeech } from "../speech/parse";
 import type { Parsed } from "../speech/parse";
+import Icon from "./Icon";
 
 interface SRResult { isFinal: boolean; [i: number]: { transcript: string } }
 interface SREvent { resultIndex: number; results: { length: number; [i: number]: SRResult } }
@@ -103,7 +105,7 @@ export default function VoiceInput(props: { onApply: (p: Parsed) => void }) {
 
   return (
     <details className="voice accordion">
-      <summary> 🎙️ Speak or type the details</summary>
+      <summary><Icon component={Mic} size={18} className="icon-gap" />Speak or type the details</summary>
       <p className="note">
         Try: "age 58, blood pressure 140, diabetes yes, smoker no, LDL 130". Nothing is filled in until you confirm.
       </p>
@@ -129,11 +131,11 @@ export default function VoiceInput(props: { onApply: (p: Parsed) => void }) {
         {SR ? (
           listening ? (
             <button type="button" className="btn soft small" onClick={stopListening}>
-              ⏹ Stop listening
+              <Icon component={Square} size={14} className="icon-gap-sm" />Stop listening
             </button>
           ) : (
             <button type="button" className="btn soft small" onClick={start}>
-              🎙️ Start speaking
+              <Icon component={Mic} size={16} className="icon-gap-sm" />Start speaking
             </button>
           )
         ) : (

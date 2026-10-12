@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from "react";
+import { Pause, Play, Square, Volume2 } from "lucide-react";
 import type { SectionId, Segment } from "../speech/script";
 import { useSpeech } from "../speech/tts";
+import Icon from "./Icon";
 
 export default function ReadAloud(props: { segments: Segment[]; onSection: (id: SectionId | null) => void }) {
   const { segments, onSection } = props;
@@ -28,22 +30,22 @@ export default function ReadAloud(props: { segments: Segment[]; onSection: (id: 
     <div className="card listen-bar" role="region" aria-label="Read the report aloud">
       {sp.state === "idle" && (
         <button className="btn primary small" onClick={() => sp.speak(segments)} disabled={segments.length === 0}>
-          🔊 Listen to this report
+          <Icon component={Volume2} size={16} className="icon-gap-sm" />Listen to this report
         </button>
       )}
       {sp.state === "speaking" && (
         <button className="btn soft small" onClick={sp.pause}>
-          ⏸ Pause
+          <Icon component={Pause} size={14} className="icon-gap-sm" />Pause
         </button>
       )}
       {sp.state === "paused" && (
         <button className="btn primary small" onClick={sp.resume}>
-          ▶ Resume
+          <Icon component={Play} size={14} className="icon-gap-sm" />Resume
         </button>
       )}
       {sp.state !== "idle" && (
         <button className="btn soft small" onClick={sp.stop}>
-          ⏹ Stop
+          <Icon component={Square} size={14} className="icon-gap-sm" />Stop
         </button>
       )}
 

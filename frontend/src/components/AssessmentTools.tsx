@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ArrowLeftRight, Bookmark, Download, FileText } from "lucide-react";
 import { explain } from "../api";
 import type { Target } from "../api";
 import { changedInputs, completeness, displayInput, predictionOf, probabilityChange } from "../assessment";
@@ -6,6 +7,7 @@ import type { Assessment, Explanations } from "../assessment";
 import { TARGETS, TARGET_LABELS } from "../fields";
 import LoadingStatus from "./LoadingStatus";
 import InputCompleteness from "./InputCompleteness";
+import Icon from "./Icon";
 
 export default function AssessmentTools({ current, explanations, outdated, baseline, setBaseline, captureHeart }: {
   captureHeart: () => HTMLCanvasElement;
@@ -57,13 +59,13 @@ export default function AssessmentTools({ current, explanations, outdated, basel
   }
 
   return <section className="card assessment-tools" aria-label="Assessment summary and tools">
-    <div className="assessment-tools-heading"><div><h3>Assessment snapshot</h3>
+    <div className="assessment-tools-heading"><div><h3><Icon component={FileText} size={20} className="icon-gap" />Assessment snapshot</h3>
       <p className="note">{current.name || "Unnamed patient"} · {new Date(current.createdAt).toLocaleString()}</p></div>
       <div className="assessment-tool-buttons">
         <button className="btn soft" onClick={() => setBaseline(structuredClone(current))} disabled={baseline?.id === current.id}>
-          {baseline ? "Replace comparison baseline" : "Use as comparison baseline"}</button>
+          <Icon component={Bookmark} size={16} className="icon-gap-sm" />{baseline ? "Replace comparison baseline" : "Use as comparison baseline"}</button>
         <button className="btn primary" onClick={() => void exportReport()} disabled={exporting}>
-          {exporting ? "Preparing report…" : "Download PDF report"}</button>
+          <Icon component={Download} size={18} className="icon-gap-sm" />{exporting ? "Preparing report…" : "Download PDF report"}</button>
       </div>
     </div>
     {outdated && <p className="note">Exports and comparisons use the last completed assessment, not your unsubmitted form edits.</p>}
@@ -72,7 +74,7 @@ export default function AssessmentTools({ current, explanations, outdated, basel
     {exportError && <p className="error" role="alert">{exportError}</p>}
     <InputCompleteness inputs={current.inputs} effective={current.demo ? undefined : current.result.context?.effective_inputs} submitted />
     {baseline && <div className="assessment-comparison">
-      <div className="comparison-heading"><h3>Assessment comparison</h3><button className="btn soft" onClick={() => setBaseline(null)}>Clear comparison</button></div>
+      <div className="comparison-heading"><h3><Icon component={ArrowLeftRight} size={18} className="icon-gap-sm" />Assessment comparison</h3><button className="btn soft" onClick={() => setBaseline(null)}>Clear comparison</button></div>
       {!comparing ? <p className="note">Baseline saved for this session. Edit the patient details and analyze again to compare. Reloading the page clears the comparison.</p> : <>
         <p className="note">Changes are current minus baseline, in percentage points (pp). This is a comparison of model outputs, not evidence that an input change causes a health outcome.</p>
         {baseline.name !== current.name && <p className="note">These snapshots have different patient names. Check that this is the comparison you intended.</p>}

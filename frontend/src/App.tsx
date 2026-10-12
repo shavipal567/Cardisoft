@@ -1,5 +1,33 @@
 import type { HeartViewerHandle } from "./components/HeartViewer";
 import { useEffect, useRef, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  ArrowDown,
+  CalendarDays,
+  ChevronsDown,
+  ChevronsUp,
+  ClipboardList,
+  Cigarette,
+  Droplet,
+  Droplets,
+  FileUp,
+  Gauge,
+  Heart,
+  HeartPulse,
+  Moon,
+  PlusCircle,
+  Ruler,
+  Search,
+  Stethoscope,
+  Sun,
+  Syringe,
+  User,
+  UserRound,
+  UserRoundCheck,
+  Users,
+  UsersRound,
+  Weight,
+} from "lucide-react";
 import { predict, explain, getInputDefaults, DEMO_MODE } from "./api";
 import type { PredictResponse, ExplainResponse, Target, Patient, Pred, InputValues } from "./api";
 import { FIELDS, GROUPS, SAMPLE, TARGETS, TARGET_LABELS, riskColor, fieldError, buildPayload } from "./fields";
@@ -20,6 +48,8 @@ import ExplainabilityCard from "./components/ExplainabilityCard";
 import CarePlan from "./components/CarePlan";
 import ReadAloud from "./components/ReadAloud";
 import VoiceInput from "./components/VoiceInput";
+import Icon from "./components/Icon";
+import type { IconComponent } from "./components/Icon";
 import { buildScript } from "./speech/script";
 import type { SectionId } from "./speech/script";
 import type { Parsed } from "./speech/parse";
@@ -44,6 +74,35 @@ const QUOTES = [
   "Progress, not perfection. One steady step at a time.",
 ];
 
+const GROUP_ICONS: Record<string, IconComponent> = {
+  "About the patient": UserRound,
+  "Vitals and examination": HeartPulse,
+  "Medical history": ClipboardList,
+  Symptoms: Stethoscope,
+  "ECG findings": HeartPulse,
+  "Blood chemistry and lipids": Droplets,
+  "Blood count and inflammation": Droplet,
+  Echocardiography: HeartPulse,
+};
+
+const FIELD_ICONS: Record<string, IconComponent> = {
+  PatientName: User,
+  Age: CalendarDays,
+  Sex: UsersRound,
+  Weight,
+  Length: Ruler,
+  BP: HeartPulse,
+  PR: HeartPulse,
+  LDL: Droplets,
+  HDL: Droplets,
+  TG: Droplets,
+  FBS: Droplet,
+  "Current Smoker": Cigarette,
+  "EX-Smoker": Cigarette,
+  DM: Syringe,
+  FH: Users,
+};
+
 function Percent({ value }: { value: number }) {
   const [n, setN] = useState(0);
   useEffect(() => {
@@ -58,19 +117,6 @@ function Percent({ value }: { value: number }) {
     return () => cancelAnimationFrame(raf);
   }, [value]);
   return <>{formatModelProbability(n)}</>;
-}
-
-function ThemeIcon({ dark }: { dark: boolean }) {
-  return dark ? (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-    </svg>
-  ) : (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
-    </svg>
-  );
 }
 
 export default function App() {
@@ -386,7 +432,7 @@ export default function App() {
             </button>
           </div>
           <button className="theme-toggle" onClick={() => setDark((d) => !d)} aria-label="Toggle dark theme">
-            <ThemeIcon dark={dark} />
+            <Icon component={dark ? Moon : Sun} size={18} />
             {dark ? "Light mode" : "Dark mode"}
           </button>
         </div>
@@ -397,8 +443,9 @@ export default function App() {
         <span>{DEMO_MODE ? "Fixed example predictions and explanations — changing inputs does not change these results." : "Assessments are calculated by the saved models from your submitted measurements."}</span>
       </div>
       <div className="alert">
-        <b>🚑 Emergency (India):</b> call <b>112</b> (national emergency) or <b>108</b> (ambulance). Chest pain,
-        trouble breathing or fainting: do not wait for this tool.
+        <span className="alert-icon"><Icon component={AlertTriangle} size={18} /></span>
+        <span><b>Emergency (India):</b> call <b>112</b> (national emergency) or <b>108</b> (ambulance). Chest pain,
+        trouble breathing or fainting: do not wait for this tool.</span>
       </div>
 
       {clinician && (
@@ -433,14 +480,22 @@ export default function App() {
           {/* ---------- Patient form ---------- */}
           <section id="assessment-inputs" ref={inputRef} tabIndex={-1} className="card rise patient-form" aria-labelledby="patient-heading">
             <div className="form-toolbar">
-              <div className="section-heading">
-                <span className="step-number">01</span>
-                <div><h2 id="patient-heading">Patient details</h2><p className="note">All 54 model inputs are available. Enter what you know; every field is optional.</p></div>
-              </div>
+                <div className="section-heading">
+                  <span className="step-number">01</span>
+                  <div><h2 id="patient-heading"><Icon component={UserRound} size={20} className="icon-gap" />Patient details</h2><p className="note">All 54 model inputs are available. Enter what you know; every field is optional.</p></div>
+                </div>
               <div className="form-tools">
-                {result && <button className="btn soft" onClick={jumpToResults}>View results ↓</button>}
-                <button className="btn soft" onClick={resetAssessment}>Start new assessment</button>
-                <button className="btn soft" onClick={loadSample} disabled={reportParsing}>Load sample patient</button>
+                {result && (
+                  <button className="btn soft" onClick={jumpToResults}>
+                    <Icon component={ArrowDown} size={16} className="icon-gap-sm" />View results
+                  </button>
+                )}
+                <button className="btn soft" onClick={resetAssessment}>
+                  <Icon component={PlusCircle} size={18} className="icon-gap-sm" />Start new assessment
+                </button>
+                <button className="btn soft" onClick={loadSample} disabled={reportParsing}>
+                  <Icon component={UserRoundCheck} size={18} className="icon-gap-sm" />Load sample patient
+                </button>
               </div>
             </div>
 
@@ -448,7 +503,7 @@ export default function App() {
 
             {clinician && (
           <details className="pdf-box accordion">
-            <summary>Import measurements from a report <span>PDF or image · Optional</span></summary>
+            <summary><Icon component={FileUp} size={18} className="icon-gap" />Import measurements from a report <span>PDF or image · Optional</span></summary>
             <div className="pdf-content">
             <label className="btn soft pdf-btn" aria-busy={reportParsing}>
               {reportParsing ? "Reading report…" : "Choose PDF or image"}
@@ -494,10 +549,17 @@ export default function App() {
             {reportParsing && <LoadingStatus label={reportProgress} detail="Extracting measurements locally. Review imported values before analyzing." />}
             <div className="field-search-bar">
               <label htmlFor="field-search">Find an input</label>
-              <input id="field-search" type="search" value={fieldSearch} placeholder="Search name or abbreviation, e.g. LDL" onChange={(event) => setFieldSearch(event.target.value)} />
+              <div className="field-search-input">
+                <Icon component={Search} size={16} />
+                <input id="field-search" type="search" value={fieldSearch} placeholder="Search name or abbreviation, e.g. LDL" onChange={(event) => setFieldSearch(event.target.value)} />
+              </div>
               {fieldSearch && <button className="btn soft" onClick={() => setFieldSearch("")}>Clear search</button>}
-              <button className="btn soft" disabled={Boolean(query)} onClick={() => setOpenGroups(GROUPS.map((group) => group.title))}>Expand all</button>
-              <button className="btn soft" disabled={Boolean(query)} onClick={() => setOpenGroups([])}>Collapse all</button>
+              <button className="btn soft" disabled={Boolean(query)} onClick={() => setOpenGroups(GROUPS.map((group) => group.title))}>
+                <Icon component={ChevronsDown} size={16} className="icon-gap-sm" />Expand all
+              </button>
+              <button className="btn soft" disabled={Boolean(query)} onClick={() => setOpenGroups([])}>
+                <Icon component={ChevronsUp} size={16} className="icon-gap-sm" />Collapse all
+              </button>
             </div>
             <p className="note input-source-key">Entered = your input · Imported = from a report · Sample = example data · Default = used when blank</p>
             {query && <p className="note" role="status">{matchingCount} model inputs match “{fieldSearch}”.</p>}
@@ -515,7 +577,7 @@ export default function App() {
                   const isOpen = event.currentTarget.open;
                   setOpenGroups((previous) => isOpen ? previous.includes(g.title) ? previous : [...previous, g.title] : previous.filter((title) => title !== g.title));
                 }}>
-                  <summary><span><span className="group-number">{String(groupIndex + 1).padStart(2, "0")}</span>{g.title}</span>
+                  <summary><span><span className="group-number">{String(groupIndex + 1).padStart(2, "0")}</span><Icon component={GROUP_ICONS[g.title] ?? ClipboardList} size={18} className="icon-gap-sm" />{g.title}</span>
                     <span className="group-completion">{g.keys.filter((key) => values[key] !== undefined).length}/{g.keys.length} supplied{groupErrors > 0 && <b> · {groupErrors} to fix</b>}</span>
                   </summary>
                   <fieldset className="group form-section-content" aria-label={g.title}>
@@ -584,7 +646,12 @@ export default function App() {
                     <div className="num-grid">
                       {nums.map((f) => (
                         <div key={f.key} className="field" data-source={values[f.key] === undefined ? "default" : (sources[f.key] ?? "Entered").toLowerCase()}>
-                          <div className="field-heading"><label htmlFor={`input-${encodeURIComponent(f.key)}`}>{f.label}</label><FieldInfo fieldKey={f.key} label={f.label} /></div>
+                          <div className="field-heading">
+                            <label htmlFor={`input-${encodeURIComponent(f.key)}`}>
+                              {FIELD_ICONS[f.key] && <Icon component={FIELD_ICONS[f.key]} size={16} className="icon-gap-sm" />}{f.label}
+                            </label>
+                            <FieldInfo fieldKey={f.key} label={f.label} />
+                          </div>
                           <input
                             type="number"
                             step="any"
@@ -607,7 +674,12 @@ export default function App() {
                     <div className="num-grid">
                       {choices.map((f) => (
                         <div key={f.key} className="field" data-source={values[f.key] === undefined ? "default" : (sources[f.key] ?? "Entered").toLowerCase()}>
-                          <div className="field-heading"><label htmlFor={`input-${encodeURIComponent(f.key)}`}>{f.label}</label><FieldInfo fieldKey={f.key} label={f.label} /></div>
+                          <div className="field-heading">
+                            <label htmlFor={`input-${encodeURIComponent(f.key)}`}>
+                              {FIELD_ICONS[f.key] && <Icon component={FIELD_ICONS[f.key]} size={16} className="icon-gap-sm" />}{f.label}
+                            </label>
+                            <FieldInfo fieldKey={f.key} label={f.label} />
+                          </div>
                           <select id={`input-${encodeURIComponent(f.key)}`} data-feature={f.key} value={values[f.key] ?? ""}
                             aria-invalid={Boolean(errors[f.key])} aria-describedby={`input-${encodeURIComponent(f.key)}-source${errors[f.key] ? ` input-${encodeURIComponent(f.key)}-error` : ""}`}
                             onChange={(e) => updateField(f.key, e.target.value)}>
@@ -635,6 +707,7 @@ export default function App() {
                 <span>Optional fields can be left blank.</span>
               </div>
               <button className="btn primary" onClick={analyze} disabled={loading || reportParsing}>
+                <Icon component={HeartPulse} size={18} className="icon-gap-sm" />
                 {loading ? "Analyzing..." : "Analyze patient"}
               </button>
               {error && <p className="error" role="alert">{error}</p>}
@@ -648,15 +721,15 @@ export default function App() {
           <section id="assessment-results" className="results-panel" ref={resultsRef} tabIndex={-1} aria-labelledby="results-heading" aria-busy={loading}>
             <div className="section-heading">
               <span className="step-number">02</span>
-              <div><h2 id="results-heading">Assessment results</h2><p className="note">{result ? "Select an estimate to explore its explanation." : "Your assessment will appear here."}</p></div>
+              <div><h2 id="results-heading"><Icon component={HeartPulse} size={20} className="icon-gap" />Assessment results</h2><p className="note">{result ? "Select an estimate to explore its explanation." : "Your assessment will appear here."}</p></div>
             </div>
             {loading && <LoadingStatus label="Calculating model estimates…" detail={result ? "Updating the assessment. Previous results remain below until the new estimates are ready." : "Processing the submitted inputs for overall CAD and all three arteries."} />}
             {resultsOutdated && <p className="results-update" role="status">Patient measurements have changed. Select Analyze patient to update these results.</p>}
             {!result ? (loading ? null : (
-              <div className="card empty rise">
-                <div className="empty-icon" aria-hidden="true">
-                  <svg viewBox="0 0 48 48" fill="none"><path d="M24 40S6 29 6 16a10 10 0 0 1 18-6 10 10 0 0 1 18 6c0 13-18 24-18 24Z" /><path d="M10 24h8l4-9 5 17 4-8h7" /></svg>
-                </div>
+                <div className="card empty rise">
+                  <div className="empty-icon" aria-hidden="true">
+                    <Icon component={HeartPulse} size={38} />
+                  </div>
                 <span className="eyebrow">READY WHEN YOU ARE</span>
                 <h3>Every assessment starts with the details</h3>
                 <p>Enter the available patient details and select <b>Analyze patient</b> to see the overall estimate, artery view, and contributing factors.</p>
@@ -684,7 +757,7 @@ export default function App() {
                         style={{ animationDelay: `${i * 80}ms` }}
                         onClick={() => setTarget(t)}
                       >
-                        <div className="risk-name">{clinician ? TARGET_LABELS[t] : PLAIN_LABEL[t]}</div>
+                        <div className="risk-name">{t === "CAD" && <Icon component={Gauge} size={16} className="icon-gap-sm" />}{clinician ? TARGET_LABELS[t] : PLAIN_LABEL[t]}</div>
                         <div className="pct">
                           <Percent value={p.probability} />
                         </div>
@@ -759,7 +832,7 @@ export default function App() {
         </main>
       )}
 
-      <p className="quote">💙 {quote}</p>
+      <p className="quote"><Icon component={Heart} size={16} className="icon-gap-sm" /> {quote}</p>
       <p className="notice">
         <b>Clinical Safety Notice:</b> This system is a machine-learning research and decision-support
         prototype intended for educational and demonstration purposes. Its predictions are not a medical
