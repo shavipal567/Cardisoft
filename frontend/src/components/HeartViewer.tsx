@@ -1,5 +1,6 @@
 import { Component, Suspense, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import type { ComponentRef, ReactNode, RefObject, Ref } from "react";
+import { Compass, Download, Heart, Maximize2, RotateCcw } from "lucide-react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Html, Line, useGLTF } from "@react-three/drei";
@@ -16,6 +17,7 @@ import { hollowMajorVessels } from "../anatomy/vesselLumens";
 import type { VesselFindings } from "../anatomy/stenosis";
 import { formatModelProbability } from "../anatomy/stenosis";
 import ArteryPopup from "./ArteryPopup";
+import Icon from "./Icon";
 
 const GLB_URL = "/heart.glb";
 useGLTF.preload(GLB_URL);
@@ -330,14 +332,14 @@ export default function HeartViewer({ ref, probabilities, classifications, vesse
     role={expanded ? "dialog" : undefined} aria-modal={expanded || undefined}
     aria-label={expanded ? "Expanded heart anatomy" : undefined}>
     <div className="heart-head">
-      <div><p className="eyebrow">EXPLORE IN 3D</p><h3>Heart anatomy</h3>
+      <div><p className="eyebrow">EXPLORE IN 3D</p><h3><Icon component={Heart} size={20} className="icon-gap" />Heart anatomy</h3>
         <p className="note"><strong>Percentages show the model-estimated probability of stenosis (artery narrowing) in each vessel.</strong> They do not measure the percentage of narrowing.</p></div>
       <div className="heart-header-actions">
-        <button onClick={() => void exportPng()} disabled={!ready || exporting}>{exporting ? "Exporting…" : "Export PNG"}</button>
-        <button onClick={() => tour === null ? tourStep(0) : stopTour()}>{tour === null ? "Guided tour" : "End tour"}</button>
-        <button onClick={resetView}>Reset view</button>
+        <button onClick={() => void exportPng()} disabled={!ready || exporting}><Icon component={Download} size={14} className="icon-gap-sm" />{exporting ? "Exporting…" : "Export PNG"}</button>
+        <button onClick={() => tour === null ? tourStep(0) : stopTour()}><Icon component={Compass} size={14} className="icon-gap-sm" />{tour === null ? "Guided tour" : "End tour"}</button>
+        <button onClick={resetView}><Icon component={RotateCcw} size={14} className="icon-gap-sm" />Reset view</button>
         <button ref={expandButton} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
-          {expanded ? "Exit expanded view" : "Expand view"}
+          <Icon component={Maximize2} size={14} className="icon-gap-sm" />{expanded ? "Exit expanded view" : "Expand view"}
         </button>
       </div>
     </div>

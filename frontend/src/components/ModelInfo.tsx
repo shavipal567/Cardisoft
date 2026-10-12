@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { BarChart3, BrainCircuit } from "lucide-react";
 
 import { DEMO_MODE, getModelInfo } from "../api";
 import type { ModelMetrics } from "../api";
+import Icon from "./Icon";
 
 const LIMITS = [
   "Small dataset: 303 patients from one source, with no external validation.",
@@ -30,7 +32,7 @@ export default function ModelInfo() {
   return (
     <div>
       <div className="card">
-        <h2>About the model</h2>
+        <h2><Icon component={BrainCircuit} size={20} className="icon-gap" />About the model</h2>
         {DEMO_MODE && <p className="note">Demo mode: saved evaluation snapshot. Predictions are illustrative fixtures.</p>}
         <p style={{ margin: "0 0 6px" }}>
           <b>{m.model_name}.</b> {m.status}
@@ -43,7 +45,7 @@ export default function ModelInfo() {
       </div>
 
       <div className="card" style={{ marginTop: 14 }}>
-        <h3>Validation metrics per target</h3>
+        <h3><Icon component={BarChart3} size={18} className="icon-gap-sm" />Validation metrics per target</h3>
         <div style={{ overflowX: "auto" }}>
           <table>
             <thead>

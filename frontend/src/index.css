@@ -9,37 +9,67 @@
   --text-lead: 1rem;
   --text-card-title: 1.125rem;
   --text-section-title: 1.25rem;
+  --text-display: clamp(1.5rem, 2.2vw, 1.75rem);
   --text-metric: clamp(1.875rem, 2.5vw, 2rem);
   --text-primary-metric: clamp(2.25rem, 3.5vw, 3rem);
   --leading-heading: 1.3;
   --leading-copy: 1.6;
+  --weight-body: 400;
+  --weight-strong: 600;
+  --weight-heading: 700;
+  --weight-display: 800;
+
+  /* Surfaces: light theme sits on a neutral, airy grey-blue. */
   --bg1: #f3f7fa;
   --text: #34495e; --text-strong: #2a4660; --muted: #6d8aa3; --line: #d3e4f0;
   --card: #ffffff;
+  --card-2: #ffffff;
+  --accordion-bg: #ffffff;
+  --accordion-open: #fbfdff;
   --input: #fbfeff; --input-line: #d5e5ef; --chip: #f7fbfd;
+  --surface-hover: rgba(90, 174, 224, 0.09);
+  --bar: #ffffff;
+  --toolbar: #f7fbfd;
   --blue-d: #3f8fbf;
   --green: #d3f0e1; --green-d: #2f7a57;
   --pink: #fde1ea; --pink-d: #a8425b;
   --accent: #5aaee0; --accent-2: #7fd1ae;
+  /* Text color used on bright accent fills; keeps label contrast above 4.5:1. */
+  --on-accent: #0a1a2e;
+  --danger: #a8425b; --danger-surface: #fde1ea; --danger-border: rgba(168, 66, 91, 0.28);
   --shadow: 0 4px 20px rgba(35, 68, 94, 0.05);
+  --shadow-raised: 0 4px 16px rgba(35, 68, 94, 0.12);
+  --shadow-bar: 0 -2px 18px rgba(35, 68, 94, 0.1);
   --canvas1: #eaf6fd; --canvas2: #f3faf7;
   --alert-bg: #fde1ea; --alert-text: #8a3a4e;
   --label-bg: #ffffff;
 }
 
+/* Surfaces: dark theme keeps the navy identity with clean elevation steps
+   (page -> card -> accordion/group -> input) instead of translucency. */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg1: #0e1a2b;
-  --text: #dbe6f2; --text-strong: #f1f6fb; --muted: #93a7bd; --line: #2a4262;
-  --card: rgba(22, 36, 56, 0.76);
-  --input: #13213a; --input-line: #2d4663; --chip: #18283f;
+  --bg1: #0b1526;
+  --text: #d7e3f1; --text-strong: #f2f7fc; --muted: #a1b5cb; --line: #263c5c;
+  --card: #142236;
+  --card-2: #182a42;
+  --accordion-bg: #101c30;
+  --accordion-open: #1a2c47;
+  --input: #0d1929; --input-line: #38557a; --chip: #1c2e48;
+  --surface-hover: rgba(255, 255, 255, 0.045);
+  --bar: #101d31;
+  --toolbar: #0f1c2f;
   --blue-d: #7cc0e8;
-  --green: rgba(111, 205, 163, 0.18); --green-d: #8fe0b9;
-  --pink: rgba(240, 140, 170, 0.18); --pink-d: #f5a3bb;
-  --accent: #4f9fd1; --accent-2: #5dbf93;
-  --shadow: 0 8px 28px rgba(0, 0, 0, 0.38);
+  --green: rgba(111, 205, 163, 0.16); --green-d: #8fe0b9;
+  --pink: rgba(240, 140, 170, 0.16); --pink-d: #f6aec4;
+  --accent: #5aa5d6; --accent-2: #5dbf93;
+  --on-accent: #081426;
+  --danger: #f28aa5; --danger-surface: rgba(226, 92, 124, 0.16); --danger-border: rgba(240, 141, 167, 0.4);
+  --shadow: 0 1px 2px rgba(2, 8, 18, 0.5), 0 8px 24px rgba(2, 8, 18, 0.28);
+  --shadow-raised: 0 2px 4px rgba(2, 8, 18, 0.55), 0 14px 34px rgba(2, 8, 18, 0.36);
+  --shadow-bar: 0 -2px 10px rgba(2, 8, 18, 0.5), 0 -14px 40px rgba(2, 8, 18, 0.34);
   --canvas1: #14263d; --canvas2: #12222f;
-  --alert-bg: rgba(240, 140, 170, 0.16); --alert-text: #f5b4c6;
+  --alert-bg: rgba(226, 92, 124, 0.16); --alert-text: #f6aec4;
   --label-bg: #1b2d47;
 }
 
@@ -48,14 +78,20 @@
 body {
   margin: 0;
   font-family: "Nunito", system-ui, "Segoe UI", sans-serif;
+  font-size: var(--text-body);
+  font-weight: var(--weight-body);
   color: var(--text);
-  line-height: 1.5;
+  line-height: var(--leading-copy);
   background: var(--bg1);
-  transition: background-color 0.3s;
+  transition: background-color 0.3s, color 0.3s;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
+/* A soft radial wash keeps the dark navy from reading as flat black. */
 :root[data-theme="dark"] body {
-  background: var(--bg1);
+  background: radial-gradient(120% 85% at 50% -10%, #16273f 0%, var(--bg1) 62%) no-repeat, var(--bg1);
+  background-attachment: fixed;
 }
 
 #root {
@@ -73,6 +109,7 @@ h1, h2, h3, h4 {
   color: var(--text-strong);
   letter-spacing: normal;
   line-height: var(--leading-heading);
+  font-weight: var(--weight-heading);
 }
 
 input, button, select, textarea { font: inherit; }
