@@ -22,7 +22,8 @@ luck; honest mean 0.7067. LCX recall 0.333→0.458. Done below: §2
 §4 candidates. Remaining: §3 chains/CAD-as-OR, §5 features, §6 calibration.
 
 Full per-config CV numbers live in `training/artifacts/<target>/metadata.json`
-(`all_cv_results`: 31 configs × 10 repeats × 5 folds per target). This file records winners,
+(`all_cv_results`: 32 configs × 10 repeats × 5 folds per target, including voting).
+The current search spans seven families. This file records winners,
 deltas, and next steps only.
 
 ## 1. Historical v1 baseline (superseded by v2 above)
@@ -70,6 +71,13 @@ Grounding facts (measured on `dataset/dataset.csv`, n=303):
 - [x] Gain-importance stability: top-10 overlap across model seeds is recorded.
       This is not a patient-specific SHAP stability check and does not by itself
       establish whether a model is overfitting.
+- [x] Voting probability contract: `(n_samples, 2)` in `[0, 1]` class order;
+      outer-fold F1 uses the threshold tuned within that training fold.
+- [x] Voting winner stability: refit and re-tune for each repeat seed; skip
+      members without usable importances when forming the ensemble ranking.
+- [x] Focused regression checks in `training/tests/` cover the voting artifact
+      round trip and LightGBM native/voting predictions, with warnings treated
+      as errors in the LightGBM checks.
 
 ## 3. Vessel-dependence modeling (biggest structural headroom)
 
@@ -88,21 +96,38 @@ Grounding facts (measured on `dataset/dataset.csv`, n=303):
 
 - [x] LightGBM with native categoricals (pass Sex/BBB/VHD/Region RWMA + Y/N
       flags as categorical, skip one-hot on its path).
-- [x] CatBoost (ordered boosting, strong on n<1k, raw categories).
+- [x] CatBoost with native categorical handling. The saved artifact uses
+      Plain boosting, verified from resolved parameters; earlier documentation
+      incorrectly called this Ordered boosting.
 - [x] HistGradientBoosting as sklearn-native baseline.
 - [x] Regularized small grids: `num_leaves ∈ {7, 15, 31}`,
       `min_child_samples ∈ {10, 20}`, feature_fraction=0.8 for LightGBM. Shallow + high leaf minimum is the anti-overfit setting for n=242.
 - [x] Stacking: OOF predictions of RF + XGB + HistGBM → LogReg meta-learner.
-      Inner preprocessing isolation remains a follow-up; stacking won no target.
+      Stacking won no saved target.
+- [x] Soft voting: RF + XGB + HGB + LightGBM + CatBoost + ElasticNet, with
+      weights and threshold tuned for F2. Voting won no saved target.
+- [x] Fit fresh preprocessing clones inside stacking and voting inner folds
+      (2026-10-11), including stability and final refitting. Regression checks
+      verify row isolation, imputation/scaling/category fitting, and artifact
+      compatibility. Historical ensemble CV scores still need a new training run.
+- [x] `LGBMArrayClassifier` supplies fitted feature names for NumPy predictions
+      in both native and voting tracks, avoiding repeated sklearn warnings
+      while preserving probabilities.
 - [x] Pin new deps identically in `training/requirements.txt` and
       `backend/requirements.txt` (unpickling requires version match).
 
 ## 5. Feature engineering backlog (each judged by repeated-CV delta, not test)
 
-- [ ] `log1p` on skewed labs: TG, FBS, WBC, PLT, ESR (today only RobustScaled).
-- [ ] Ratios/counts: LDL/HDL, TG/HDL, non-HDL; comorbidity count
-      (DM+HTN+smoking+FH+DLP); ECG abnormality count (Q+ST+T+LVH+BBB); symptom
-      burden (Typical+Atypical+Dyspnea+Function Class).
+- [x] Shared training/inference feature sets: `log1p` TG/FBS/ESR; LDL/HDL,
+      TG/HDL, Neut/Lymph; five-factor risk count and four-finding ECG count.
+      New-run defaults: CAD logs, LAD counts, LCX ratios+counts, RCA baseline.
+      Metadata/schema record the choice; explanations recompute derived values
+      from raw inputs. These defaults follow exploratory accuracy results, not
+      independently validated feature selection. Existing artifacts need retraining.
+- [ ] Nested selection among feature sets. The current nested option fixes one
+      candidate feature set before the run and retains an original-input comparator.
+- [ ] Additional candidates: WBC/PLT logs, wider ECG counts and symptom summaries.
+      Measured non-HDL cholesterol requires total cholesterol, absent in this CSV.
 - [ ] Winsorize TG/FBS/WBC/PLT/HDL/BUN at 1st/99th percentiles (review, never
       blind-drop — e.g. TG 1050 may be real).
 - [ ] Ablations: VHD ordinal vs one-hot; Region RWMA ordinal vs one-hot; drop vs
@@ -111,11 +136,17 @@ Grounding facts (measured on `dataset/dataset.csv`, n=303):
 
 ## 6. Calibration & reporting (protects the demo; doesn't raise AUC)
 
-- [ ] Calibrate inside CV folds: isotonic for CAD/LAD, Platt/sigmoid for
-      LCX/RCA. Report Brier score + calibration curves (PROBLEM.md asks for
-      "preferably calibrated" vessel probabilities).
-- [ ] Keep API threshold at 0.5; report Youden-J / F1-optimal thresholds per
-      vessel in `metrics.json` so LCX/RCA recall (~0.46/~0.39) is contextualized.
+- [x] CAD nested experiment: compare raw, Platt and isotonic with additional
+      calibration subfolds; choose on inner log loss and evaluate on untouched
+      outer folds. Save Brier, log loss, calibration intercept/slope, ECE,
+      prevalence baseline, ROC/PR/calibration/F2/confusion plots and patient
+      bootstrap intervals. Serving models remain unchanged.
+- [ ] Extend the audited calibration protocol to vessel models. Do not assume
+      isotonic is appropriate for a small dataset; evaluate it against sigmoid
+      and raw probabilities inside training data.
+- [ ] Report alternative Youden-J / F1-optimal thresholds per vessel in
+      `metrics.json` so LCX/RCA recall (~0.46/~0.39) is contextualized. Evaluation
+      and API labels use the saved threshold (tuned for voting, otherwise 0.5).
 
 ## 7. Non-goals (with reasons)
 
@@ -131,8 +162,9 @@ Grounding facts (measured on `dataset/dataset.csv`, n=303):
 
 ## 8. Remaining execution order
 
-1. Isolate preprocessing inside stacking's inner folds; make importance handling
-   robust to estimators without `feature_importances_` before expanding that track.
+1. Re-evaluate stacking and voting with inner-fold preprocessing; make
+   stacking importance handling robust to estimators without
+   `feature_importances_` before expanding that track (voting is covered).
 2. Classifier-chain and CAD-as-OR experiments, judged by repeated CV.
 3. Feature-engineering ablations; retain only supported improvements.
 4. Calibration, uncertainty reporting and ROC/PR/calibration plots.
@@ -140,3 +172,9 @@ Grounding facts (measured on `dataset/dataset.csv`, n=303):
 
 Patient-specific approximate permutation explanations, live frontend defaults,
 backend validation and artifact-backed dashboard metrics are implemented.
+
+## MAIN:
+1. make the 3d visualization more interactive(for example clicking on the LAD might open up a simple tube clotted by plague buildup)
+2. show the blood flow inside the vessels
+3. IMPROVE THE GRAPHS
+4. Show heart beat in this heart

@@ -1,0 +1,11 @@
+- **TG:** skew changes from 4.00 to 0.73 after log1p.
+- **FBS:** skew changes from 2.26 to 1.26 after log1p.
+- **ESR:** skew changes from 1.76 to -0.25 after log1p.
+- **Largest observed CAD association among the eight candidates:** log1p_FBS, feature AUC 0.685, rank-biserial effect +0.371, BH-adjusted p 0.0001731. This is a marginal association, not incremental model performance.
+- **CAD:** `counts` has the lowest observed mean OOF log loss: 0.3337 → 0.3256 (change -0.0081); AUC changes 0.9284 → 0.9296. Log loss improves in 2/3 paired repeats.
+- **LAD:** `ratios_counts_logs` has the lowest observed mean OOF log loss: 0.5196 → 0.5124 (change -0.0072); AUC changes 0.8391 → 0.8483. Log loss improves in 2/3 paired repeats.
+- **LCX:** `counts` has the lowest observed mean OOF log loss: 0.6107 → 0.6056 (change -0.0050); AUC changes 0.7110 → 0.7211. Log loss improves in 3/3 paired repeats.
+- **RCA:** `ratios_counts` has the lowest observed mean OOF log loss: 0.6082 → 0.6012 (change -0.0069); AUC changes 0.7011 → 0.7113. Log loss improves in 2/3 paired repeats.
+- Ratios/counts summarize existing measurements; they do not create independent clinical information. Log transforms preserve ranks exactly.
+- Feature choices can differ by target and metric. A small observed improvement in this exploratory analysis is not evidence of a robust generalization gain.
+- Before adopting a feature set, include the baseline and these candidates in inner-fold selection, then evaluate the complete selection procedure on outer folds. Revisit individual features only in that training-side procedure.

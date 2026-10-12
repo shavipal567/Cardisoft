@@ -1,0 +1,62 @@
+{
+  "target": "cad",
+  "csv_column": "Cath",
+  "positive_label": "CAD",
+  "n_train": 242,
+  "n_test": 61,
+  "pos_rate_train": 0.7148760330578512,
+  "threshold": 0.5,
+  "threshold_policy": "fixed_0.5",
+  "alternative_thresholds": {
+    "fixed_0.5": 0.5,
+    "f2_max": 0.2063470888865223,
+    "sensitivity_0.9": 0.49371947601334554,
+    "sensitivity_0.95": 0.38473219517163326,
+    "specificity_0.8": 0.6412999860691743,
+    "specificity_0.9": 0.765239496119303
+  },
+  "calibration": "sigmoid",
+  "protocol": "nested_cv",
+  "best": {
+    "model": "cat",
+    "prep": "native",
+    "candidate": "stopping_only",
+    "params": {
+      "depth": 4,
+      "learning_rate": 0.05,
+      "l2_leaf_reg": 3,
+      "auto_class_weights": "Balanced",
+      "iterations": 150
+    },
+    "inner_validation_log_loss": 0.311415594757052,
+    "cv_roc_auc": 0.9279950133899714,
+    "cv_roc_auc_std": 0.0327760776661859,
+    "cv_f1": 0.9074406049202703,
+    "cv_pr_auc": 0.9704084566469474,
+    "cv_brier": 0.09734258306625733,
+    "n_scores": 50
+  },
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51
+  ],
+  "git_hash": "da80b9bfef94eab5c17cefd2cf4b0e1232e72a7d",
+  "status": "Experimental candidate; serving artifacts have not been replaced",
+  "random_state": 42,
+  "test_size": 0.2,
+  "repeats": 10,
+  "cv_folds": 5,
+  "inner_folds": 3,
+  "selection_metric": "unweighted_log_loss",
+  "split_strategy": "stratified",
+  "cv_evaluation_scope": "whole_nested_selection_calibration_threshold_procedure",
+  "cv_std_definition": "sample SD across dependent outer folds"
+}

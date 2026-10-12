@@ -1,0 +1,32 @@
+{
+  "dataset": "/home/remandey/my-programs/Cardisoft/dataset/dataset.csv",
+  "dataset_sha256": "dfe06e123151f995437c60a77f8bfa9ddf68848958b2ea2b7a6eb60c42971af0",
+  "git_head": "da80b9bfef94eab5c17cefd2cf4b0e1232e72a7d",
+  "versions": {
+    "catboost": "1.2.10",
+    "scikit-learn": "1.7.2",
+    "numpy": "1.26.4",
+    "pandas": "2.2.3",
+    "scipy": "1.14.1",
+    "joblib": "1.5.3",
+    "matplotlib": "3.7.5"
+  },
+  "source_sha256": {
+    "learning_curves.py": "f6e39aa436e542b9cc9a556ec4fe4b981369a35e7cb44c0a2cc2ef8934e0c9a9",
+    "calibration.py": "0243badc78829d0934f24fdbcde989555ccfaec62dfbd10a413a4c7ea5d500d6",
+    "preprocessing.py": "212090c471602b46c2625746eb8626329a6a7580826712adcc56799eb23250b8",
+    "nested_cv.py": "34f0ada4c19d5b7721b8d48a65ee16c6a5e718234f40145ad5a1b80d455d6280",
+    "stacking.py": "bebb5dd69ebfe25cee0c2c18042cb6b34e71ed28cb82e6ab664f4d5286e6012d",
+    "ensemble_cv.py": "7750dc519d5202d3bef5b055638b8ad016c760c06ea76b912e070ab12c775e08",
+    "evaluation_plots.py": "2f6757a6f8e27f2ce99ca1ac549b6bdef154870e16ebe9406772557e7daecd33",
+    "model_info.py": "fd9b3759909be7f10d0ef2fd643824082291d9bad91da547d57bcc272daa5fe4",
+    "native_models.py": "b7e376934926ad272cb901bc3b4e3fbe78aa612119890f838123fe88b817b71a",
+    "evaluate.py": "6cb465d9ab29bde25f882cf99d5d8a15831fc107955df8a15275fb018c8a6848",
+    "experiment_report.py": "560b20980d1a95cd3e1bd2d8a282c09c01999985686d1ad9c56325c346b335a8",
+    "voting.py": "4e51a5ec58a534b0488de5fd4241d0e9132d7688253070f6a13f3bd128182a10",
+    "train.py": "ba532c1f04e4bf2d75bf478808210fd600a6600083e42fd1b14ac3d1546d2842",
+    "requirements.txt": "a365644dab4b5a7094e7e04051e612bbd6114354744d4ff1ec132d2ed0006c2a",
+    "clinical_metrics.py": "98747f907f2a2feccc380276e6c2983d0c9aa1dba3d6be30b16881793b550ffb",
+    "inference.py": "a94216967a7432e41e146194e8659948b1a9feb0fe30d19af0f3382e6bbcf1ed"
+  }
+}

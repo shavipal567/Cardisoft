@@ -1,273 +1,259 @@
-# Training — leakage-safe CAD + vessel models
+# Training and inference
 
-All machine learning lives in this folder. Nothing here serves HTTP; that is
-`backend/`'s job. `backend/` consumes only the frozen artifacts produced here
-via the contract in `inference.py`.
+This directory owns feature engineering, model fitting, evaluation and frozen
+inference for CAD and the three vessel targets. The backend loads its artifacts;
+HTTP requests never fit models or choose a feature set.
 
-Related docs: `../PROBLEM.md` (challenge spec), `../dataset/columns.metadata.md`
-(per-column stats and modeling priors), `./requirements.txt` (pinned deps).
+## Implementation and saved-model status
 
-## 1. Dataset
+The engineered pipeline is implemented for new runs. Existing artifacts in
+`training/artifacts/` still use baseline features: CatBoost for CAD and Random
+Forest for LAD, LCX and RCA. Their stored metrics have not been replaced with
+results from the feature-analysis notebook.
 
-Source `../dataset/dataset.csv`: **303 rows × 59 columns**, zero missing values
-(verified). The 4 target columns are leakage and never inputs:
+The raw schema remains 54 inputs from `dataset/dataset.csv` (303 rows × 59
+columns). `split_features_target()` removes all four diagnosis columns and
+constant `Exertional CP`, then applies the input allow-list.
 
-| target key | CSV column | positive label | balance (n=303) |
-|---|---|---|---|
-| `cad` | `Cath` | `CAD` | CAD 216 (71.3%) / Normal 87 — imbalanced, stratified split required |
-| `lad` | `LAD` | `Stenotic` | Stenotic 177 (58.4%) / Normal 126 |
-| `lcx` | `LCX` | `Stenotic` | Stenotic 119 (39.3%) / Normal 184 |
-| `rca` | `RCA` | `Stenotic` | Stenotic 114 (37.6%) / Normal 189 |
+| Target | Label column | Positive label |
+|---|---|---|
+| `cad` | `Cath` | `CAD` |
+| `lad` | `LAD` | `Stenotic` |
+| `lcx` | `LCX` | `Stenotic` |
+| `rca` | `RCA` | `Stenotic` |
 
-Remaining 55 columns minus `Exertional CP` (zero variance, all `N`) = **54 input
-features** (`ALL_INPUT_FEATURES` in `preprocessing.py`).
+## Reproduce a serving-model training run
 
-Known data quirks handled in code: `Sex` contains the typo `Fmale` (127 rows);
-`Region RWMA` codes are integers 0–4 with undocumented mapping (treated as
-categorical); `CHF` has a single positive, `LowTH Ang` has 2, and several Y/N
-flags have <12 positives (unstable under CV — kept, not dropped, so the
-pipeline stays faithful to the data); outliers worth reviewing but never
-blind-dropped: TG 1050, FBS 400, WBC 18000, PLT 25/742, HDL 111.
+Commands in this guide start at the repository root. Install the pinned training
+dependencies with Python 3.10+:
 
-## 2. Layout
+```bash
+python3 -m pip install -r training/requirements.txt
+python3 training/train.py --feature-set auto
+python3 training/evaluate.py
+python3 training/model_info.py --output frontend/public/model-info.json
+```
+
+The training command replaces the requested serving artifacts. Evaluation scores
+all four saved targets and writes metrics/confusion matrices. The metadata export
+refreshes the frontend's offline snapshot. Restart the backend after updating the
+complete bundle. Avoid serving the directory while files are being replaced.
+
+Useful variants:
+
+```bash
+python3 training/train.py --targets cad --feature-set logs
+python3 training/train.py --targets cad --feature-set baseline
+python3 training/train.py --targets lad lcx --feature-set ratios_counts
+python3 training/train.py --targets cad --feature-set ratios_counts_logs --repeats 2
+```
+
+A reduced-repeat command still writes serving artifacts; it is not a dry run.
+`evaluate.py` uses the repository's fixed seed-42, 80/20 split and default artifact
+location. `ARTIFACTS_DIR` is an inference/backend override, not a training or
+legacy evaluation output flag.
+
+## Feature-set policy
+
+`--feature-set auto` resolves once per target, before model selection:
+
+| Target | Resolved set | Change from original inputs |
+|---|---|---|
+| CAD | `logs` | Replace TG/FBS/ESR with `log1p` values |
+| LAD | `counts` | Add risk-factor count and ECG-finding count |
+| LCX | `ratios_counts` | Add three ratios and both counts |
+| RCA | `baseline` | Use original inputs |
+
+Available explicit sets are `baseline`, `ratios`, `counts`, `logs`,
+`ratios_counts` and `ratios_counts_logs`. One explicit set applies to every target
+named in that command.
+
+The counts are `DM + HTN + Current Smoker + FH + 1[DLP = Y]` and
+`Q Wave + St Elevation + St Depression + Tinversion`. Ratios are LDL/HDL, TG/HDL
+and Neut/Lymph. Counts and ratios retain their original component inputs. Logs
+replace their three source columns. These are experimental representations, not
+validated clinical scores. Total cholesterol is absent, so no non-HDL feature is
+computed.
+
+Defaults follow exploratory accuracy results from
+`dataset/engineered-feature-analysis.ipynb`: three repeats of five-fold CV on
+242 development records per target. The defaults were chosen after inspecting
+those results. The training search fixes that feature choice and still selects
+**models by ROC-AUC, breaking ties with F1**. It does not independently validate
+feature selection or optimise accuracy.
+
+See [feature engineering](../docs/feature-engineering.md) for the full evidence,
+[preprocessing](../docs/preprocessing.md) for dimensions and transform order, and
+[the analysis guide](../dataset/README.md) for exported results.
+
+## Shared preprocessing
 
 ```text
-training/
-├── preprocessing.py   # constants, clean_dataframe(), build_preprocessor() [one-hot],
-│                      # build_native_preprocessor() [integer codes], encode_target(),
-│                      # split_features_target(), get_output_feature_names()
-├── train.py           # repeated-CV comparison (RF/XGB/HGB/LGBM/CatBoost/stack/vote) + artifacts
-│                      # --targets flag, --repeats flag (default 10)
-├── stacking.py        # StackedModel: OOF base preds + LogReg meta (one-hot track)
-├── voting.py          # VotingClassifier: soft vote + weight/threshold optimization
-├── native_models.py    # CatBoostNative adapter (int-cast I/O, same artifact contract)
-├── evaluate.py        # held-out test metrics -> artifacts/metrics.json
-├── inference.py       # frozen-artifact loading + predict_patient() / transformed_row()
-├── requirements.txt   # pandas==2.2.3, numpy==1.26.4, scikit-learn==1.7.2, xgboost==3.2.0,
-│                      # lightgbm==4.6.0, catboost==1.2.10, joblib==1.5.3
-├── README.md
-├── IMPROVEMENTS.md    # backlog + v2 status table
-├── logs/              # training run logs (gitignored)
-└── artifacts/         # generated by train.py, intentionally TRACKED (backend loads it)
-    ├── cad/{preprocessor.joblib, model.joblib, shap_background.npz, metadata.json}  (CatBoost, ~180K)
-    ├── lad/{...}  (RF, ~2.5M)
-    ├── lcx/{...}  (RF, ~2.7M)
-    ├── rca/{...}  (RF, ~2.4M)
-    ├── metrics.json
-    └── experiments.csv  # every config × target × run (CV AUC/F1/PR-AUC/Brier)
+54 raw fields → cleaning → numeric feature engineering
+                         → fold-fitted imputation/encoding/scaling → model
 ```
 
-## 3. Leakage prevention (mandatory, PROBLEM.md §6)
+`clean_dataframe()` normalises `Fmale` to `Female` and treats `Region RWMA` as a
+categorical code. `NumericFeatureEngineer` performs fixed row-wise calculations
+inside the numeric branch, before median imputation and `RobustScaler`.
 
-```python
-LEAKAGE_COLUMNS = ["LAD", "LCX", "RCA", "Cath"]
-```
+- A ratio with a missing/invalid operand or nonpositive denominator is missing.
+- A log needs a finite, nonnegative source value.
+- Counts require all binary constituents; missing fields do not count as zero.
+- Derived missing values are imputed using the current training fold. Engineered
+  numeric branches retain all-missing outputs to preserve column positions.
+- All preprocessing is cloned/fitted within each CV fold, including the inner
+  folds used by stacking and voting.
 
-`split_features_target(df, target_column, positive)` drops these four **plus**
-the target column **plus** `DROP_COLUMNS = ["Exertional CP"]` for every target,
-then keeps only known `ALL_INPUT_FEATURES`. Consequences:
-
-- Predicting CAD never sees `Cath` *or* any vessel label; predicting LAD never
-  sees `LAD` (nor LCX/RCA/Cath), etc.
-- New stray columns in a future CSV are excluded by the allow-list, not just
-  the drop-list.
-- Preprocessors are fitted on **train data only**: manually inside each outer CV fold, and on the 242-row train split
-  for the final refit. The 61-row test split is never touched until
-  `evaluate.py`.
-
-Verify yourself after training:
-
-```bash
-python3 -c "
-import joblib
-names = list(joblib.load('artifacts/cad/preprocessor.joblib').get_feature_names_out())
-print([n for n in names if any(l in n for l in ['LAD','LCX','RCA','Cath'])] or 'NONE - ok')
-"
-```
-
-## 4. Preprocessing (`preprocessing.py`)
-
-`clean_dataframe()` (idempotent, applied identically at train and inference):
-
-- `Sex`: `Fmale` → `Female`.
-- `Region RWMA`: int codes → strings so the encoder treats them as categories.
-
-`build_preprocessor()` returns a `ColumnTransformer` producing **81 output
-features**:
-
-| branch | transform | features |
+| Track | Models | Categorical handling |
 |---|---|---|
-| `num` (33 cols) | `SimpleImputer(median)` → `RobustScaler` | Age, Weight, Length, BMI, DM, HTN, Current Smoker, EX-Smoker, FH, BP, PR, Edema, Typical Chest Pain, Function Class, Q Wave, St Elevation, St Depression, Tinversion, FBS, CR, TG, LDL, HDL, BUN, ESR, HB, K, Na, WBC, Lymph, Neut, PLT, EF-TTE (0/1 binaries ride along as numerics) |
-| `cat` (21 cols) | `SimpleImputer(most_frequent)` → `OneHotEncoder(handle_unknown="ignore")` | 17 Y/N flags (Obesity, CRF, CVA, Airway disease, Thyroid Disease, CHF, DLP, Weak Peripheral Pulse, Lung rales, Systolic/Diastolic Murmur, Dyspnea, Atypical, Nonanginal, LowTH Ang, LVH, Poor R Progression) + Sex (2) + BBB (N/LBBB/RBBB) + VHD (N/mild/Moderate/Severe) + Region RWMA (5 codes) |
+| `onehot` | RF, XGBoost, HistGradientBoosting, stacking | Mode imputation and one-hot encoding |
+| `native` | LightGBM, CatBoost | Mode imputation and integer codes; unseen categories map to −1 |
+| `voting` | Soft-voting ensemble | One-hot track followed by `StandardScaler(with_mean=False)` |
 
-Design notes: `RobustScaler` over `StandardScaler` because TG/FBS/WBC/PLT/ESR
-are heavily right-skewed; no log-transform was applied in v1/v2 (recorded as
-future work); tree winners don't need scaling but the shared preprocessor keeps
-one code path and stays correct if a linear model is tried later.
-`handle_unknown="ignore"` makes inference robust to unseen categories.
+There are 33 baseline numeric columns and 21 categorical input fields. Ratios add
+three numeric outputs; counts add two; logs keep the numeric width unchanged.
+Native positions come from `native_cat_indices(feature_set)`. One-hot width also
+depends on the categories observed in that fold; do not hard-code 81 columns.
 
-Native track (`build_native_preprocessor()`, for LightGBM / CatBoost):
-numerics identical to the one-hot track; the 21 categoricals become integer
-codes (`OrdinalEncoder`, unknown/missing → −1) instead of one-hot columns.
-Output order is `[NUMERIC_FEATURES..., NATIVE_CAT_FEATURES...]`, so
-`native_cat_indices()` gives the categorical positions passed as
-`categorical_feature` (LGBM) / `cat_features` (CatBoost) at every fit.
-`CatBoostNative` (`native_models.py`) int-casts on the way in at both fit
-*and* predict time, because CatBoost rejects float matrices with cat
-features — this keeps the saved artifact layout identical
-(`preprocessor.joblib` + `model.joblib`), so `inference.py` and the backend
-work unchanged. `metadata.json` records which track won (`prep` field).
+Low-level builders default to `feature_set="baseline"` for compatibility.
+`train_target()` resolves the target policy and passes it through CV, stability
+checks, ensemble fitting and final refitting. Inference uses the saved
+preprocessor, never the current `auto` policy.
 
-## 5. Training (`train.py`)
+## Model selection
 
-Per target: stratified 80/20 split (`test_size=0.2`, `random_state=42` → 242
-train / 61 test) + **repeated** stratified 5-fold CV on the train partition
-(`--repeats`, default 10, seeds 42–51 → 50 scores per config). Preprocessors
-are fitted inside every fold. Per-fold metrics: ROC-AUC, F1, PR-AUC
-(`average_precision`), Brier score. Full search space — 32 configs:
+Each target uses its own stratified 80/20 split with seed 42: 242 development and
+61 holdout records. By default, 10 seeds (42–51) each produce five development CV
+folds. Fold membership is stratified by that target, so holdout rows differ
+between targets.
 
-- `RandomForestClassifier(class_weight="balanced", n_jobs=-1)` × 8 (one-hot):
-  `n_estimators ∈ {200, 400}`, `max_depth ∈ {8, None}`,
-  `min_samples_leaf ∈ {1, 2}`.
-- `XGBClassifier(tree_method="hist", subsample=colsample=0.8, reg_lambda=1.0,
-  eval_metric="logloss")` × 8 (one-hot): `n_estimators ∈ {200, 400}`,
-  `max_depth ∈ {3, 4}`, `learning_rate ∈ {0.05, 0.1}`, with `scale_pos_weight`
-  computed from each target's train balance.
-- `HistGradientBoostingClassifier(class_weight="balanced")` × 4 (one-hot):
-  `learning_rate = 0.05`, `max_leaf_nodes ∈ {15, 31}`,
-  `min_samples_leaf ∈ {10, 20}`.
-- `LGBMClassifier` × 6 (**native** track): `num_leaves ∈ {7, 15, 31}`,
-  `min_child_samples ∈ {10, 20}`, `learning_rate = 0.05`,
-  `feature_fraction = 0.8`, `n_estimators = 300`.
-- `CatBoostNative` × 4 (**native** track): `depth ∈ {4, 6}`,
-  `learning_rate = 0.05`, `l2_leaf_reg ∈ {3, 10}`, `iterations = 400`,
-  `auto_class_weights = "Balanced"`.
-- `StackedModel` × 1 (one-hot track): RF + XGB + HGB base models with
-  inner 3-fold out-of-fold predictions → `LogisticRegression` meta-learner
-  (`stacking.py`).
-- `VotingClassifier` × 1 (voting track): RF + XGB + HGB + LGBM + CatBoost +
-  ElasticNet base models with soft voting. Member weights and decision threshold
-  are grid-searched on out-of-fold CV predictions to maximize F2 (accuracy
-  tiebreak, then recall). Top-4 models by individual CV F2 are selected for
-  the weight search (`voting.py`).
+| Family | Configurations | Main settings searched |
+|---|---:|---|
+| Random Forest | 8 | 200/400 trees; depth 8/unlimited; leaf minimum 1/2 |
+| XGBoost | 8 | 200/400 trees; depth 3/4; learning rate .05/.1 |
+| HistGradientBoosting | 4 | 15/31 leaves; minimum leaf size 10/20 |
+| LightGBM | 6 | 7/15/31 leaves; minimum child samples 10/20 |
+| CatBoost | 4 | Depth 4/6; L2 3/10; 400 iterations |
+| Stacking | 1 | RF/XGB/HGB predictions with a logistic-regression meta-model |
+| Voting | 1 | RF/XGB/HGB/LGBM/CatBoost/ElasticNet with tuned weights and threshold |
 
-Selection: highest **mean** CV ROC-AUC, tie-break mean CV F1. The winner is
-refit on the full 242-row train split and saved with its preprocessor.
-A top-10 feature-stability check (mean pairwise Jaccard across repeat seeds)
-is recorded in `metadata.json`. v2 winners (full per-config tables in
-`artifacts/<target>/metadata.json`, every run in `artifacts/experiments.csv`):
+The 32-configuration search records ROC-AUC, F1, average precision and Brier score.
+Mean ROC-AUC selects a winner, then mean F1 breaks ties. Voting chooses its weights
+and threshold on inner OOF predictions using F2; other candidates use threshold
+0.5. Native categorical indices are supplied to LightGBM/CatBoost at every fit.
 
-| target | winner | params | mean CV AUC | mean CV F1 | stability |
-|---|---|---|---|---|---|
-| cad | CatBoost (native) | depth=4, lr=0.05, l2=3 | 0.9273±0.030 | 0.9074 | 0.85 |
-| lad | RF | n_est=400, depth=None, leaf=2 | 0.8428±0.058 | 0.8181 | 0.83 |
-| lcx | RF | n_est=400, depth=None, leaf=2 | 0.7400±0.060 | 0.5103 | 0.66 |
-| rca | RF | n_est=400, depth=8, leaf=2 | 0.7067±0.068 | 0.4377 | 0.77 |
+Winning CV scores reuse the selection folds and can be optimistic. The legacy
+XGBoost class-weight ratio is computed from the full development partition;
+this is a known limitation. Historical ensemble scores predate the inner-fold
+preprocessing correction and have not been regenerated. Neither ensemble won
+an existing serving target.
 
-Notes: v1 (single 5-fold, RF-vs-XGB only) picked all-RF
-(CAD 0.9272 / LAD 0.8385 / LCX 0.7279 / RCA 0.7343). Under 10 repeats,
-CatBoost-native takes CAD while RF holds the vessels with shifted configs —
-and v1's RCA pick (0.7343) is exposed as seed luck against its honest mean
-(0.7067). LGBM-native, HistGBM and the stack were fairly compared and lost
-on every head.
+## Saved artifacts
 
-Each `artifacts/<target>/` holds:
+New `train_target()` runs write these files under `training/artifacts/<target>/`:
 
-- `preprocessor.joblib` — fitted preprocessor (train-only fit; one-hot,
-  native, or voting track, see `metadata.json` → `best.prep`).
-- `model.joblib` — fitted classifier (`RandomForest`/`XGB`/`HGB`/`LGBM`/
-  `CatBoostNative`/`StackedModel`/`VotingClassifier` — all expose `predict_proba`).
-- `shap_background.npz` — 100 transformed train rows (seeded) for probability-space permutation explanations.
-- `metadata.json` — target/column/positive label, train/test sizes and pos
-  rates, winning config, **all per-config CV summaries**, winner stability
-  Jaccard, repeats/seeds, git hash. Voting models also record `threshold` and
-  `voting_weights`.
+| File | Contents |
+|---|---|
+| `preprocessor.joblib` | Fitted encoding, feature engineering, imputation and scaling |
+| `model.joblib` | Fitted classifier consuming transformed inputs |
+| `metadata.json` | Model/configuration, resolved feature set, split, CV results, thresholds and revision |
+| `feature_schema.json` | Raw inputs, transformed output names and engineered features |
+| `shap_background.npz` | Up to 100 transformed development rows under key `background` |
+| `shap_raw_background.joblib` | The corresponding raw development rows for engineered-model explanations |
 
-## 6. Evaluation (`evaluate.py`)
+`experiments.csv` records each configuration and feature set. When an old log is
+extended, existing rows are labelled `baseline`. No labels enter the backgrounds'
+input columns. The backend still accepts only the 54 raw measurements.
 
-Rebuilds the identical stratified split (same seed) and scores the frozen
-artifacts — the test rows were never used for fitting or selection. Writes
-`artifacts/metrics.json` and prints the table. Current held-out results
-(v2; PROBLEM.md §10 metrics + confusion counts):
+`inference.py` loads and caches preprocessors/models, returns positive-class
+probabilities and applies each saved threshold. It fingerprints model and
+preprocessor bytes for prediction/explanation version matching. Old artifacts
+without feature-set metadata keep their existing baseline transforms.
 
-| target | acc | prec | rec | F1 | ROC-AUC | TN/FP/FN/TP (n=61) |
-|---|---|---|---|---|---|---|
-| cad | 0.852 | 0.870 | 0.930 | 0.899 | 0.893 | 12/6/3/40 |
-| lad | 0.787 | 0.795 | 0.861 | 0.827 | 0.843 | 17/8/5/31 |
-| lcx | 0.672 | 0.611 | 0.458 | 0.524 | 0.711 | 30/7/13/11 |
-| rca | 0.672 | 0.600 | 0.391 | 0.474 | 0.748 | 32/6/14/9 |
+For engineered models, the explainer changes raw fields and reruns the frozen
+preprocessor on every path. This recalculates dependent ratios, counts and logs.
+The raw background must travel with those models. Baseline models can use the
+original transformed background. [Explanation contract](../docs/explainability.md).
 
-v1 → v2 test AUC: CAD 0.877→0.893, LAD 0.839→0.843, LCX 0.693→0.711,
-RCA 0.735→0.748. LCX recall increased from 0.333 to 0.458.
-
-Reading: CAD and LAD generalize well; LCX/RCA still detect a minority of
-positives — expected on 303 rows with ~38% prevalence and sparse
-signals, reported as-is rather than tuned away. CAD's 6 false positives vs 3
-false negatives reflect the 71% CAD prevalence and balanced class weights.
-
-## 7. Reproduce
+## Separate nested CAD experiments
 
 ```bash
-pip install -r training/requirements.txt
-python training/train.py                              # all four targets, 10 repeats (~2h CPU)
-python training/train.py --targets cad --repeats 2    # fast smoke test
-python training/evaluate.py                           # prints table, writes metrics.json
+python3 training/train.py --protocol nested --feature-set logs
 ```
 
-Determinism: fixed seeds everywhere (split seed 42, CV seeds 42–51,
-model seeds, background sampling). Reruns reproduce the same test split and
-artifacts. Per-config logs go to stdout; run logs are kept in
-`training/logs/` (gitignored). Every config × target × run is appended to
-`artifacts/experiments.csv` for comparison across runs.
+The nested entry point accepts `--config`, `--output`, `--dataset`,
+`--group-column` and `--feature-set`; it does not accept legacy `--targets` or
+`--repeats`. Repeat counts and other settings come from its JSON configuration.
 
-## 8. Inference contract (for `backend/`)
+Experiments go to a new `training/experiments/cad_nested_<UTC>/` directory.
+They preserve the serving bundle and save source/data fingerprints, split rows,
+inner searches, outer predictions, calibration/threshold diagnostics, reports
+and a model under `model/cad/`.
 
-`inference.py` performs **no fitting** — only `joblib.load` (cached) + transform
-+ `predict_proba`:
+The candidate uses one fixed feature set. Historical configurations without
+`feature_set` default to `baseline`; `--feature-set auto` resolves to CAD `logs`.
+The comparison baseline always uses original inputs. Inner folds choose model
+settings, iteration count and calibration; outer folds evaluate that procedure.
+This is not nested selection among feature sets, and prior inspection of the
+cohort remains a limitation.
 
-- `predict_patient(features: dict)` — keys are raw CSV column names; missing
-  keys become `None` → imputed by the frozen preprocessor. Returns the
-  PROBLEM.md §23 schema: `{cad: {prediction, probability}, vessels: {LAD, LCX,
-  RCA}}`. Uses the saved threshold from `metadata.json` (default 0.5 for
-  non-voting models).
-- `transformed_row(features, target="cad")` — returns the transformed vector
-  and names: 54 native columns for CAD, 81 one-hot columns for the vessel winners.
-- `available()` — `True` iff all four artifact dirs load.
-- `artifacts_dir()` — `ARTIFACTS_DIR` env var, default `training/artifacts/`.
+Experimental artifacts also include `pipeline.joblib`, accepting a raw DataFrame
+through `FeatureSchema`, preprocessing and the calibrated-or-raw classifier.
+A CAD-only experimental directory is not a complete four-target serving bundle;
+its metadata/reporting schema also differs from the legacy dashboard schema.
+Do not point the full application at it as though it were a serving export.
 
-`backend/services/predictor.py` is a thin re-export of this module, so there is
-exactly one implementation of cleaning, transformation, and thresholding —
-transformation drift is reduced. API schema defaults remain distinct from
-fitted imputation; validate through `PatientInput` when reproducing HTTP inputs.
+See [CAD nested validation](../docs/cad-nested-validation.md) for the audited
+protocol, completed historical comparison and reproduction details.
 
-## 9. Limitations & next steps
+## Learning curves and evaluation
 
-- n=303 limits LCX/RCA (honest CV means 0.74/0.71, stability 0.66/0.77);
-  options: classifier chains over vessel co-occurrence, CAD-as-OR ensemble,
-  calibration (Platt/isotonic), threshold tuning per vessel, grouped
-  rare-level handling, log-transforms for skewed labs (see `IMPROVEMENTS.md`
-  §§3/5/6 — §§2/4 are done).
-- Single 80/20 test split — small (61 rows, ±0.06 AUC noise); selection now
-  uses 10×5-fold CV means, but a larger cohort is the real fix.
-- Probabilities are uncalibrated model votes — do not present them as
-  validated risk percentages (calibration backlogged).
-- Explanations now use approximate grouped permutation Shapley contributions
-  computed with NumPy and each saved model's `predict_proba`. No SHAP/numba
-  dependency or global-importance fallback is used (see `docs/explainability.md`).
-- The optional stacking candidate preprocesses at the outer-fold level before
-  inner OOF predictions. Inner-fold preprocessing isolation remains work; this
-  candidate did not win any saved target.
+`--learning-curves best` is the default; `all` exports every candidate and `none`
+disables curve export. Curves are saved under each target's
+`learning_curves/<UTC-run>/<config>/` directory as PNGs, metrics CSV and metadata.
+They show log loss, ROC-AUC, average precision, accuracy, F1, F2 and Brier score.
 
-## 10. Dashboard metadata
-
-The backend serves `/model-info` using `training/model_info.py`, reading saved
-metrics and per-target metadata from `ARTIFACTS_DIR`. Refresh the offline demo
-snapshot after evaluating new artifacts:
+Legacy curves use the first **selection CV fold**, not the holdout or an
+independent outer evaluation. Nested curves use inner training/validation rows.
+Feature-set identity is included in curve metadata.
 
 ```bash
-python training/model_info.py --output frontend/public/model-info.json
+python3 training/train.py --curves-only
+python3 training/train.py --targets cad --curves-only
 ```
 
-The frontend defaults to live prediction. Static prediction/explanation fixtures
-are used only in explicitly labelled demo mode. Regression checks live in
-`backend/tests/` and run with `python -m unittest discover -s backend/tests -v`.
+These commands refit the saved configuration on a CV fold for diagnostics without
+replacing serving models. They restore the feature set from saved metadata,
+falling back to baseline for historical models. An explicit feature-set override
+is rejected in this mode.
+
+`evaluate.py` scores the frozen serving models and writes `metrics.json`, the
+combined confusion-matrix PNG and one PNG per target. It does not tune models or
+thresholds. Keep this evaluation separate from the exploratory feature-CV results.
+[Evaluation definitions](../docs/evaluation.md).
+
+## Verification and module guide
+
+```bash
+MPLCONFIGDIR=/tmp/cardisoft-mpl-cache OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 -m unittest discover -s training/tests -v
+python3 -m pip install -r backend/requirements-test.txt
+python3 -m unittest discover -s backend/tests -v
+```
+
+Tests cover the original analysis formulas, invalid/missing operands, fold
+isolation, all feature sets and tracks, native category positions, serialization,
+training/inference parity, historical artifacts and explanation consistency.
+A small nested run can check integration, but its scores are not a performance
+estimate for the full protocol.
+
+| Modules | Responsibility |
+|---|---|
+| `preprocessing.py` | Raw allow-list, feature formulas, set policy and three preprocessing builders |
+| `train.py`, `evaluate.py`, `model_info.py` | Serving-model search, frozen evaluation and dashboard metadata |
+| `calibration.py`, `clinical_metrics.py` | Calibrated inference and metrics |
+| `learning_curves.py`, `evaluation_plots.py`, `experiment_report.py` | Diagnostic exports and experiment reports |
+| `ensemble_cv.py`, `stacking.py`, `voting.py` | Fold-local ensemble training |
+| `native_models.py`, `inference.py` | Estimator adapters and artifact loading |
+
+Detailed signatures are in the [training API reference](../docs/api-reference/training.md).

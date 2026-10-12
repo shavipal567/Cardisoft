@@ -11,7 +11,8 @@ from inference import TARGET_KEYS, artifacts_dir
 from preprocessing import ALL_INPUT_FEATURES
 
 MODEL_NAMES = {"cat": "CatBoost", "rf": "Random Forest", "xgb": "XGBoost",
-               "hgb": "HistGradientBoosting", "lgbm": "LightGBM", "stack": "Stacked ensemble"}
+               "hgb": "HistGradientBoosting", "lgbm": "LightGBM",
+               "stack": "Stacked ensemble", "vote": "Voting ensemble"}
 
 
 def model_info(directory: Path | None = None) -> dict:
@@ -33,6 +34,9 @@ def model_info(directory: Path | None = None) -> dict:
             "repeats": meta["repeats"],
             "training_git_hash": meta["git_hash"],
         }
+        if "feature_set" in meta:
+            targets[key.upper()].update(feature_set=meta["feature_set"],
+                                         engineered_features=meta.get("engineered_features", []))
     return {
         "model_name": "; ".join(f"{key}: {value['model_name']}" for key, value in targets.items()),
         "status": "Saved models; held-out test results. Probabilities are not calibrated.",

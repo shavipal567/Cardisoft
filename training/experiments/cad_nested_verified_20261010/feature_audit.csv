@@ -1,0 +1,55 @@
+feature,dtype,unique,missing,included
+Age,int64,46,0,True
+Weight,int64,54,0,True
+Length,int64,44,0,True
+BMI,float64,262,0,True
+DM,int64,2,0,True
+HTN,int64,2,0,True
+Current Smoker,int64,2,0,True
+EX-Smoker,int64,2,0,True
+FH,int64,2,0,True
+BP,int64,17,0,True
+PR,int64,21,0,True
+Edema,int64,2,0,True
+Typical Chest Pain,int64,2,0,True
+Function Class,int64,4,0,True
+Q Wave,int64,2,0,True
+St Elevation,int64,2,0,True
+St Depression,int64,2,0,True
+Tinversion,int64,2,0,True
+FBS,int64,113,0,True
+CR,float64,18,0,True
+TG,int64,147,0,True
+LDL,int64,110,0,True
+HDL,float64,47,0,True
+BUN,int64,33,0,True
+ESR,int64,58,0,True
+HB,float64,66,0,True
+K,float64,27,0,True
+Na,int64,25,0,True
+WBC,int64,78,0,True
+Lymph,int64,50,0,True
+Neut,int64,52,0,True
+PLT,int64,135,0,True
+EF-TTE,int64,11,0,True
+Obesity,object,2,0,True
+CRF,object,2,0,True
+CVA,object,2,0,True
+Airway disease,object,2,0,True
+Thyroid Disease,object,2,0,True
+CHF,object,2,0,True
+DLP,object,2,0,True
+Weak Peripheral Pulse,object,2,0,True
+Lung rales,object,2,0,True
+Systolic Murmur,object,2,0,True
+Diastolic Murmur,object,2,0,True
+Dyspnea,object,2,0,True
+Atypical,object,2,0,True
+Nonanginal,object,2,0,True
+LowTH Ang,object,2,0,True
+LVH,object,2,0,True
+Poor R Progression,object,2,0,True
+Sex,object,2,0,True
+BBB,object,3,0,True
+VHD,object,4,0,True
+Region RWMA,object,5,0,True

@@ -3,7 +3,17 @@
 Source: Extension of Z-Alizadeh Sani CAD dataset (UCI).
 Shape: **303 rows × 59 columns**. Missing values: **0** (all columns complete).
 Targets (leakage — never use as inputs): `LAD, LCX, RCA, Cath`.
-Usable inputs: 55 columns (59 − 4 leakage). `Exertional CP` is zero-variance → drop.
+Non-target columns: 55 (59 − 4 targets). After dropping constant `Exertional CP`,
+the training/API allow-list contains **54 raw inputs**.
+
+This dictionary describes raw data and exploratory preprocessing suggestions.
+The current pipeline does not clip values, merge rare categories, or drop
+additional inputs based on these suggestions. Implemented encoding, scaling
+and target-specific engineered features are documented in
+[Preprocessing](../docs/preprocessing.md) and
+[Feature engineering](../docs/feature-engineering.md). Derived columns are
+computed inside the preprocessor; they are not extra source CSV columns. See
+the [dataset guide](README.md) for the feature-analysis notebook and exports.
 
 Target balance:
 - `Cath`: CAD 216 (71.3%) / Normal 87 (28.7%) — imbalanced, use stratified split.

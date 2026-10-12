@@ -1,31 +1,82 @@
-import { FIELDS, fieldValueLabel } from "./fields";
+import { FIELDS } from "./fields";
+import { normalizeExplanation, normalizePrediction, normalizePredictionContext } from "./explanation";
+import { normalizeVesselFindings } from "./anatomy/stenosis";
+import type { VesselFindings } from "./anatomy/stenosis";
 
 export type Target = "CAD" | "LAD" | "LCX" | "RCA";
 export type Vessel = Exclude<Target, "CAD">;
 export type Patient = Record<string, number>;
 
-export interface Pred { prediction: number; probability: number }
+export interface Pred { prediction: number; probability: number; threshold?: number }
 export type InputValues = Record<string, number | string>;
+export interface InputValidationMetrics {
+  accuracy: number;
+  correct: number;
+  n_test: number;
+  accuracy_interval: { low: number; high: number };
+  recall: number | null;
+  full_input_accuracy: number;
+  majority_baseline: number;
+  model_version: string;
+}
+export type InputValidation = {
+  supplied_count: number;
+  total_features: number;
+} & ({ status: "available"; method: "held_out_default_substitution"; targets: Record<Target, InputValidationMetrics> }
+  | { status: "unavailable"; reason: string });
 export interface PredictionContext {
   effective_inputs: InputValues;
   defaulted_inputs: string[];
   models: Record<Target, { name: string; version: string; training_revision: string }>;
+  input_validation?: InputValidation;
+  input_signature?: string;
+  feature_provenance?: Record<string, FeatureProvenance>;
 }
-export interface PredictResponse { cad: Pred; vessels: Record<Vessel, Pred>; context?: PredictionContext }
+export interface PredictResponse { cad: Pred; vessels: Record<Vessel, Pred>; context?: PredictionContext; vessel_findings?: VesselFindings }
 export interface FeatureContribution {
   name: string;
-  value: number | string;
+  value: number | string | null;
   contribution: number;
+  provenance?: FeatureProvenance;
   assumed?: boolean; // true when the patient omitted this input (the server used a preset default)
+}
+export type ProvenanceStatus = "recorded" | "measured" | "imputed" | "default" | "unavailable";
+export interface FeatureProvenance { status: ProvenanceStatus; method?: string; detail?: string }
+export interface ExplanationReliability {
+  model_version?: string;
+  evaluation?: string;
+  source?: string;
+  n_test?: number;
+  roc_auc?: number;
+  threshold?: number;
+  sensitivity?: number;
+  specificity?: number;
+  brier?: number;
+  selection_cv_brier?: number;
+  calibration_status?: string;
+  calibration_method?: string;
+  external_validation?: string;
+  attribution_stability?: string;
 }
 export interface ExplainResponse {
   target: Target;
-  base_value: number;
+  base_value: number | null;
   features: FeatureContribution[];
   signed?: boolean; // false = importance only (no direction), e.g. the fallback method
   method?: string;
   model_version?: string;
   note?: string;
+  probability?: number;
+  output_value?: number;
+  output_space?: string;
+  input_signature?: string;
+  remaining_contribution?: number;
+  total_features?: number;
+  background_rows?: number;
+  baseline_definition?: string;
+  approximate?: boolean;
+  reliability?: ExplanationReliability;
+  invalid_features?: boolean;
 }
 
 export const DEMO_MODE = import.meta.env.VITE_USE_MOCK === "true";
@@ -60,20 +111,6 @@ async function fail(res: Response): Promise<never> {
   throw new Error(msg);
 }
 
-function toPred(v: unknown): Pred | null {
-  if (typeof v === "number") return { probability: v, prediction: v >= 0.5 ? 1 : 0 };
-  if (v && typeof v === "object") {
-    const o = v as Record<string, unknown>;
-    const p = [o.probability, o.prob, o.proba].find((x) => typeof x === "number") as number | undefined;
-    if (p === undefined) return null;
-    const c = [o.prediction, o.label, o.predicted, o.class].find(
-      (x) => typeof x === "number" || typeof x === "boolean"
-    );
-    return { probability: p, prediction: c === undefined ? (p >= 0.5 ? 1 : 0) : Number(c) };
-  }
-  return null;
-}
-
 // Accepts {cad, vessels:{LAD..}} or {cad, lad, lcx, rca} in any letter case
 function normalizePredict(raw: unknown): PredictResponse {
   const root = (raw ?? {}) as Record<string, unknown>;
@@ -88,62 +125,15 @@ function normalizePredict(raw: unknown): PredictResponse {
   add(root.targets);
   const out: Partial<Record<Target, Pred>> = {};
   for (const t of TARGET_KEYS) {
-    const p = toPred(pool[t.toLowerCase()]);
+    const p = normalizePrediction(pool[t.toLowerCase()]);
     if (p) out[t] = p;
   }
   const missing = TARGET_KEYS.filter((t) => !out[t]);
   if (missing.length)
     throw new Error(`Unexpected /predict response (missing ${missing.join(", ")}). Keys: ${Object.keys(root).join(", ")}`);
   return { cad: out.CAD!, vessels: { LAD: out.LAD!, LCX: out.LCX!, RCA: out.RCA! },
-    context: root.context as PredictionContext | undefined };
-}
-
-// "num__Age" -> "Age";  "cat__Sex_Male" -> "Sex"
-function baseOf(name: string) {
-  const i = name.indexOf("__");
-  const prefix = i >= 0 ? name.slice(0, i) : "";
-  const rest = i >= 0 ? name.slice(i + 2) : name;
-  const cut = rest.lastIndexOf("_");
-  return prefix === "cat" && cut > 0 ? rest.slice(0, cut) : rest;
-}
-
-function normalizeExplain(raw: unknown, target: Target, patient: Patient): ExplainResponse {
-  const r = (raw ?? {}) as Record<string, unknown>;
-  const feats = Array.isArray(r.features) ? (r.features as Record<string, unknown>[]) : [];
-  const method = typeof r.method === "string" ? r.method : undefined;
-
-  // add up the one-hot pieces of the same input
-  const groups = new Map<string, { contribution: number; value: number | string; assumed: boolean }>();
-  for (const f of feats) {
-    const base = baseOf(String(f.name ?? ""));
-    const c = Number(f.contribution ?? 0);
-    const g = groups.get(base);
-    if (g) {
-      g.contribution += c;
-      continue;
-    }
-    const inForm = patient[base] !== undefined;
-    const rawVal = f.raw_value;
-    groups.set(base, {
-      contribution: c,
-      assumed: !inForm,
-      value: inForm
-        ? fieldValueLabel(base, patient[base])
-        : typeof rawVal === "number" || typeof rawVal === "string"
-          ? rawVal
-          : "default value",
-    });
-  }
-
-  return {
-    target,
-    base_value: typeof r.base_value === "number" ? r.base_value : 0,
-    method,
-    model_version: typeof r.model_version === "string" ? r.model_version : undefined,
-    note: typeof r.note === "string" ? r.note : undefined,
-    signed: typeof r.signed === "boolean" ? r.signed : method === "shap_tree" || method === "permutation_shapley",
-    features: [...groups].map(([name, g]) => ({ name, value: g.value, contribution: g.contribution, assumed: g.assumed })),
-  };
+    vessel_findings: normalizeVesselFindings(root.vessel_findings),
+    context: normalizePredictionContext(root.context) };
 }
 
 async function request(path: string, init?: RequestInit): Promise<Response> {
@@ -173,11 +163,11 @@ export async function explain(target: Target, patient: Patient): Promise<Explain
     const res = await fetch("/mock_explain.json");
     if (!res.ok) return fail(res);
     const all = (await res.json()) as Record<Target, ExplainResponse>;
-    return all[target];
+    return normalizeExplanation({ ...all[target], signed: true, method: "illustrative_demo" }, target);
   }
   const res = await post("/explain", { target: target.toLowerCase(), features: toBackend(patient), top_k: 60 });
   if (!res.ok) return fail(res);
-  return normalizeExplain(await res.json(), target, patient);
+  return normalizeExplanation(await res.json(), target);
 }
 export interface ModelMetrics {
   model_name: string;

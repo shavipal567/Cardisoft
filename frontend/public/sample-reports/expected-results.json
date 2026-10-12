@@ -1,0 +1,176 @@
+[
+  {
+    "file": "01-complete-report.png",
+    "title": "Complete report",
+    "rows": [
+      "Age: 58 years",
+      "Sex: Male",
+      "BMI: 27.4",
+      "BP: 140/90 mmHg",
+      "Pulse rate: 78 bpm",
+      "Fasting blood sugar: 110 mg/dL",
+      "LDL-C: 130 mg/dL",
+      "HDL-C: 40 mg/dL",
+      "Triglycerides: 160 mg/dL",
+      "LVEF: 50%",
+      "Diabetes: present",
+      "Hypertension: present",
+      "Smoking: none",
+      "Family history of CAD: negative",
+      "Typical chest pain: present",
+      "Q wave: absent",
+      "ST elevation: negative",
+      "ST depression: present",
+      "T inversion: present"
+    ],
+    "expected_values": {
+      "Age": 58,
+      "Sex": 1,
+      "BMI": 27.4,
+      "BP": 140,
+      "PR": 78,
+      "FBS": 110,
+      "LDL": 130,
+      "HDL": 40,
+      "TG": 160,
+      "EF-TTE": 50,
+      "DM": 1,
+      "HTN": 1,
+      "Current Smoker": 0,
+      "FH": 0,
+      "Typical Chest Pain": 1,
+      "Q Wave": 0,
+      "St Elevation": 0,
+      "St Depression": 1,
+      "Tinversion": 1
+    },
+    "expected_skipped": [],
+    "expected_error": null,
+    "expected_filled_count": 19,
+    "expected_defaulted_count_from_empty_form": 35
+  },
+  {
+    "file": "02-negative-findings.png",
+    "title": "Negative findings",
+    "rows": [
+      "Age: 46 years",
+      "Sex: Female",
+      "BMI: 23.8",
+      "BP: 118/76 mmHg",
+      "Pulse rate: 68 bpm",
+      "Fasting blood sugar: 92 mg/dL",
+      "LDL-C: 96 mg/dL",
+      "HDL-C: 58 mg/dL",
+      "Triglycerides: 110 mg/dL",
+      "LVEF: 62%",
+      "Diabetes: absent",
+      "Hypertension: absent",
+      "Smoking: none",
+      "Family history of CAD: negative",
+      "Typical chest pain: absent",
+      "Q wave: absent",
+      "ST elevation: absent",
+      "ST depression: absent",
+      "T inversion: absent"
+    ],
+    "expected_values": {
+      "Age": 46,
+      "Sex": 0,
+      "BMI": 23.8,
+      "BP": 118,
+      "PR": 68,
+      "FBS": 92,
+      "LDL": 96,
+      "HDL": 58,
+      "TG": 110,
+      "EF-TTE": 62,
+      "DM": 0,
+      "HTN": 0,
+      "Current Smoker": 0,
+      "FH": 0,
+      "Typical Chest Pain": 0,
+      "Q Wave": 0,
+      "St Elevation": 0,
+      "St Depression": 0,
+      "Tinversion": 0
+    },
+    "expected_skipped": [],
+    "expected_error": null,
+    "expected_filled_count": 19,
+    "expected_defaulted_count_from_empty_form": 35
+  },
+  {
+    "file": "03-partial-report.png",
+    "title": "Partial report",
+    "rows": [
+      "Age: 45 years",
+      "LDL-C: 92 mg/dL",
+      "Diabetes: absent"
+    ],
+    "expected_values": {
+      "Age": 45,
+      "LDL": 92,
+      "DM": 0
+    },
+    "expected_skipped": [],
+    "expected_error": null,
+    "expected_filled_count": 3,
+    "expected_defaulted_count_from_empty_form": 51
+  },
+  {
+    "file": "04-invalid-values.png",
+    "title": "Range validation test",
+    "rows": [
+      "Age: 150 years",
+      "BMI: 75.0",
+      "BP: 300/90 mmHg",
+      "Fasting blood sugar: 40 mg/dL",
+      "LDL-C: 999 mg/dL",
+      "LVEF: 95%",
+      "Pulse rate: 72 bpm",
+      "HDL-C: 55 mg/dL",
+      "Triglycerides: 150 mg/dL"
+    ],
+    "expected_values": {
+      "PR": 72,
+      "HDL": 55,
+      "TG": 150
+    },
+    "expected_skipped": [
+      "Age",
+      "BMI",
+      "BP",
+      "FBS",
+      "LDL",
+      "EF-TTE"
+    ],
+    "expected_error": null,
+    "expected_filled_count": 3,
+    "expected_defaulted_count_from_empty_form": 51
+  },
+  {
+    "file": "05-no-matching-fields.png",
+    "title": "Unstructured document",
+    "rows": [
+      "This document contains sample prose only.",
+      "Please keep this page for software testing.",
+      "The text reader should recognise these sentences.",
+      "There are no measurements to fill in the form."
+    ],
+    "expected_values": {},
+    "expected_skipped": [],
+    "expected_error": "Text was read, but no supported measurements were recognized.",
+    "expected_filled_count": 0,
+    "expected_defaulted_count_from_empty_form": 54
+  },
+  {
+    "file": "06-blank-image.png",
+    "title": "Blank image",
+    "rows": [],
+    "expected_values": {},
+    "expected_skipped": [],
+    "expected_error": "No readable text found.",
+    "expected_filled_count": 0,
+    "expected_defaulted_count_from_empty_form": 54
+  }
+]

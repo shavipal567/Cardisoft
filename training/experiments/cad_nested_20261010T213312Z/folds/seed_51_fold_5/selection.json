@@ -1,0 +1,12 @@
+{
+  "candidate": "shallower",
+  "params": {
+    "depth": 3,
+    "learning_rate": 0.05,
+    "l2_leaf_reg": 3
+  },
+  "iterations": 204,
+  "inner_validation_log_loss": 0.26618479620381424,
+  "baseline_inner_validation_log_loss": 0.29636609806359976,
+  "criterion": "Minimum mean unweighted inner-validation log loss; ties: fewer iterations, name"
+}

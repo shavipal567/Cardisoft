@@ -1,0 +1,123 @@
+{
+  "rows": 303,
+  "columns": 59,
+  "features": [
+    "Age",
+    "Weight",
+    "Length",
+    "BMI",
+    "DM",
+    "HTN",
+    "Current Smoker",
+    "EX-Smoker",
+    "FH",
+    "BP",
+    "PR",
+    "Edema",
+    "Typical Chest Pain",
+    "Function Class",
+    "Q Wave",
+    "St Elevation",
+    "St Depression",
+    "Tinversion",
+    "FBS",
+    "CR",
+    "TG",
+    "LDL",
+    "HDL",
+    "BUN",
+    "ESR",
+    "HB",
+    "K",
+    "Na",
+    "WBC",
+    "Lymph",
+    "Neut",
+    "PLT",
+    "EF-TTE",
+    "Obesity",
+    "CRF",
+    "CVA",
+    "Airway disease",
+    "Thyroid Disease",
+    "CHF",
+    "DLP",
+    "Weak Peripheral Pulse",
+    "Lung rales",
+    "Systolic Murmur",
+    "Diastolic Murmur",
+    "Dyspnea",
+    "Atypical",
+    "Nonanginal",
+    "LowTH Ang",
+    "LVH",
+    "Poor R Progression",
+    "Sex",
+    "BBB",
+    "VHD",
+    "Region RWMA"
+  ],
+  "target": "Cath == CAD (unchanged)",
+  "positive_class": 1,
+  "target_counts": {
+    "CAD": 216,
+    "Normal": 87
+  },
+  "prevalence": 0.7128712871287128,
+  "missing_cells": 0,
+  "duplicate_full_rows": 0,
+  "duplicate_input_rows": 0,
+  "group_column": null,
+  "grouped_splits": false,
+  "patient_independence_verified": false,
+  "n_groups": 303,
+  "target_vessel_disagreement_rows": [
+    93
+  ],
+  "target_vessel_disagreement_values": {
+    "93": {
+      "LAD": "Stenotic",
+      "LCX": "Normal",
+      "RCA": "Normal",
+      "Cath": "Normal"
+    }
+  },
+  "exact_binary_target_proxies": [],
+  "excluded_diagnosis_columns": [
+    "LAD",
+    "LCX",
+    "RCA",
+    "Cath"
+  ],
+  "preprocessing": "Median/mode imputation, robust scaling and ordinal vocabulary fitted inside every training partition; no resampling or feature selection",
+  "feature_availability": "Specification includes ECG/echo/lab inputs. No timestamps or acquisition protocol verify availability before angiography; all original features retained.",
+  "redundancy_review": [
+    "BMI/Weight/Length/Obesity",
+    "Lymph/Neut",
+    "chest-pain categories"
+  ],
+  "rare_feature_review": {
+    "Function Class": {
+      "0": 211,
+      "2": 73,
+      "3": 18,
+      "1": 1
+    },
+    "CVA": {
+      "N": 298,
+      "Y": 5
+    },
+    "CHF": {
+      "N": 302,
+      "Y": 1
+    },
+    "Weak Peripheral Pulse": {
+      "N": 298,
+      "Y": 5
+    },
+    "LowTH Ang": {
+      "N": 301,
+      "Y": 2
+    }
+  }
+}

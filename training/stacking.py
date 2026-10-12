@@ -1,17 +1,17 @@
 """LogReg stacking over one-hot-track base models.
 
-Operates on the TRANSFORMED (one-hot) matrix so the saved artifact stays
-compatible with the ``preprocessor.joblib + model.joblib`` contract in
-``inference.py``: ``model.predict_proba(prep.transform(df))``.
-
-Out-of-fold base predictions are computed inside :meth:`StackedModel.fit`
-(train folds only), so no held-out information leaks into the meta-learner.
+Training accepts raw features plus a preprocessor, cloned within each inner
+fold for the meta-learner's out-of-fold predictions. The supplied preprocessor
+is then fitted on all training rows, and base models are refitted on its output.
+Prediction still accepts a transformed matrix, preserving the separate
+``preprocessor.joblib + model.joblib`` serving contract.
 """
 
 import numpy as np
 from sklearn.base import clone
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import StratifiedKFold, cross_val_predict
+
+from ensemble_cv import out_of_fold_probabilities
 
 
 class StackedModel:
@@ -37,16 +37,22 @@ class StackedModel:
         self.cv = cv
         self.random_state = random_state
 
-    def fit(self, X, y):
-        X = np.asarray(X, dtype=float)
+    def fit(self, X, y, *, preprocessor=None):
+        """Fit inner-fold transforms and then refit the supplied preprocessor.
+
+        The caller owns/saves the fitted preprocessor; it is not embedded in
+        this model. Omit it only for numeric inputs needing no learned transform.
+        """
         y = np.asarray(y, dtype=int)
-        skf = StratifiedKFold(n_splits=self.cv, shuffle=True,
-                              random_state=self.random_state)
-        oof = np.zeros((len(y), len(self.estimators)))
+        oof = out_of_fold_probabilities(
+            self.estimators, X, y, cv=self.cv, seed=self.random_state,
+            preprocessor=preprocessor,
+        )
+        if preprocessor is not None:
+            X = preprocessor.fit_transform(X, y)
+        X = np.asarray(X, dtype=float)
         self.fitted_estimators_ = []
-        for j, (_, est) in enumerate(self.estimators):
-            oof[:, j] = cross_val_predict(clone(est), X, y, cv=skf,
-                                          method="predict_proba")[:, 1]
+        for _, est in self.estimators:
             fitted = clone(est).fit(X, y)
             self.fitted_estimators_.append(fitted)
         self.meta_ = clone(self.meta).fit(oof, y)

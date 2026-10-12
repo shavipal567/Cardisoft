@@ -1,0 +1,36 @@
+{
+  "target": "cad",
+  "seeds": [42, 43, 44, 45, 46, 47, 48, 49, 50, 51],
+  "split_seed": 42,
+  "test_size": 0.2,
+  "outer_folds": 5,
+  "inner_folds": 3,
+  "calibration_folds": 3,
+  "max_iterations": 400,
+  "iteration_candidates": [60, 80, 100, 120, 150],
+  "early_stopping_rounds": 40,
+  "selection_metric": "unweighted_log_loss",
+  "threshold_policy": "fixed_0.5",
+  "sensitivity_targets": [0.9, 0.95],
+  "specificity_targets": [0.8, 0.9],
+  "fixed_thresholds": [0.3, 0.4, 0.5, 0.6, 0.7],
+  "calibration_methods": ["raw", "sigmoid", "isotonic"],
+  "probability_clip": 0.000001,
+  "bootstrap_samples": 1000,
+  "bootstrap_seed": 20261011,
+  "permutation_repeats": 3,
+  "thread_count": 2,
+  "search_jobs": 3,
+  "baseline": {
+    "iterations": 400, "depth": 4, "learning_rate": 0.05,
+    "l2_leaf_reg": 3, "auto_class_weights": "Balanced", "random_seed": 42
+  },
+  "candidates": [
+    {"name": "stopping_only", "params": {"depth": 4, "learning_rate": 0.05, "l2_leaf_reg": 3, "auto_class_weights": "Balanced"}},
+    {"name": "unweighted", "params": {"depth": 4, "learning_rate": 0.05, "l2_leaf_reg": 3}},
+    {"name": "shallower", "params": {"depth": 3, "learning_rate": 0.05, "l2_leaf_reg": 3}},
+    {"name": "more_l2", "params": {"depth": 4, "learning_rate": 0.05, "l2_leaf_reg": 10}},
+    {"name": "slower", "params": {"depth": 3, "learning_rate": 0.03, "l2_leaf_reg": 3}},
+    {"name": "leaf_and_sampling", "params": {"depth": 4, "learning_rate": 0.03, "l2_leaf_reg": 10, "grow_policy": "Depthwise", "min_data_in_leaf": 15, "bootstrap_type": "Bernoulli", "subsample": 0.8, "rsm": 0.8}}
+  ]
+}

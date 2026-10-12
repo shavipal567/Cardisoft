@@ -2,7 +2,8 @@
 
 Reproduces train.py's stratified split (same seed) so evaluation uses data
 never seen during fitting. Reports Accuracy/Precision/Recall/F1/ROC-AUC per
-target (PROBLEM.md S10) and writes training/artifacts/metrics.json.
+target (PROBLEM.md S10) and writes training/artifacts/metrics.json plus
+per-target and combined confusion-matrix PNGs.
 """
 
 import json
@@ -14,6 +15,7 @@ from sklearn.metrics import (accuracy_score, confusion_matrix, f1_score,
                              precision_score, recall_score, roc_auc_score)
 from sklearn.model_selection import train_test_split
 
+from evaluation_plots import save_confusion_matrix_plots
 from preprocessing import TARGETS, split_features_target
 from train import ARTIFACTS_DIR, DATASET, RANDOM_STATE, TEST_SIZE
 
@@ -34,7 +36,7 @@ def evaluate_target(key, df):
     Xt = prep.transform(X_test)
     proba = model.predict_proba(Xt)[:, 1]
     pred = (proba >= threshold).astype(int)
-    tn, fp, fn, tp = confusion_matrix(y_test, pred).ravel().tolist()
+    tn, fp, fn, tp = confusion_matrix(y_test, pred, labels=[0, 1]).ravel().tolist()
     return {
         "target": key,
         "n_test": len(y_test),
@@ -52,11 +54,14 @@ def main():
     df = pd.read_csv(DATASET)
     results = {k: evaluate_target(k, df) for k in ("cad", "lad", "lcx", "rca")}
     METRICS_PATH.write_text(json.dumps(results, indent=2))
+    plot_paths = save_confusion_matrix_plots(results, ARTIFACTS_DIR)
     print(f"{'target':6} {'acc':>6} {'prec':>6} {'rec':>6} {'f1':>6} {'auc':>6}")
     for k, m in results.items():
         print(f"{k:6} {m['accuracy']:.3f} {m['precision']:.3f} "
               f"{m['recall']:.3f} {m['f1']:.3f} {m['roc_auc']:.3f}")
     print(f"wrote {METRICS_PATH}")
+    for path in plot_paths:
+        print(f"wrote {path}")
 
 
 if __name__ == "__main__":

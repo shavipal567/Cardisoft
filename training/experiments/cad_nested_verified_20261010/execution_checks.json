@@ -1,0 +1,17 @@
+{
+  "training_unit_tests": {
+    "command": "MPLCONFIGDIR=/tmp/cardisoft-mpl-cache OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 -m unittest discover -s training/tests -v",
+    "tests": 25,
+    "result": "passed"
+  },
+  "documentation": {
+    "command": "MPLCONFIGDIR=/tmp/cardisoft-mpl-cache python3 -m mkdocs build --strict",
+    "result": "passed"
+  },
+  "artifact_verification": {
+    "command": "MPLCONFIGDIR=/tmp/cardisoft-mpl-cache OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 training/experiments/cad_nested_verified_20261010/verify_saved_results.py training/experiments/cad_nested_verified_20261010",
+    "result": "passed",
+    "details": "verification.json"
+  },
+  "actual_count_curves": "Reconstructed 118-iteration first-outer-training diagnostic and 150-iteration final-selection diagnostic; predictions match recorded inner OOF to 1e-12."
+}

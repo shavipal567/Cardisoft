@@ -1,0 +1,55 @@
+ M IMPROVEMENTS.md
+ M README.md
+ M backend/README.md
+ M backend/routes/predict.py
+ M dataset/statistical-analysis-of-cad-dataset.ipynb
+ M docs/README.md
+ M docs/api-reference/backend.md
+ M docs/api-reference/training.md
+ M docs/api.md
+ M docs/engineering-decisions.md
+ M docs/evaluation.md
+ M docs/index.md
+ M docs/models.md
+ M docs/preprocessing.md
+ M docs/problem-formulation.md
+ M docs/visualization.md
+ M frontend/README.md
+ M frontend/public/model-info.json
+ M frontend/src/App.tsx
+ M frontend/src/api.ts
+ M frontend/src/components/HeartViewer.tsx
+ M frontend/src/features.css
+ M frontend/src/pdf/report.ts
+ M paper.tex
+ M training/IMPROVEMENTS.md
+ M training/README.md
+ M training/evaluate.py
+ M training/inference.py
+ M training/model_info.py
+ M training/native_models.py
+ M training/requirements.txt
+ M training/stacking.py
+ M training/train.py
+ M training/voting.py
+?? backend/services/input_validation.py
+?? backend/tests/test_input_validation.py
+?? frontend/src/components/InputAccuracy.tsx
+?? frontend/tests/input-accuracy.test.mjs
+?? training/artifacts/cad/confusion_matrix.png
+?? training/artifacts/cad/learning_curves/
+?? training/artifacts/confusion_matrices.png
+?? training/artifacts/lad/confusion_matrix.png
+?? training/artifacts/lad/learning_curves/
+?? training/artifacts/lcx/confusion_matrix.png
+?? training/artifacts/lcx/learning_curves/
+?? training/artifacts/rca/confusion_matrix.png
+?? training/artifacts/rca/learning_curves/
+?? training/ensemble_cv.py
+?? training/evaluation_plots.py
+?? training/experiments/
+?? training/learning_curves.py
+?? training/tests/test_ensemble_cv.py
+?? training/tests/test_evaluation_plots.py
+?? training/tests/test_learning_curves.py
+?? training/tests/test_model_info.py

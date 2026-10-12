@@ -1,0 +1,46 @@
+{
+  "target": "cad",
+  "csv_column": "Cath",
+  "positive_label": "CAD",
+  "n_train": 242,
+  "n_test": 61,
+  "pos_rate_train": 0.7148760330578512,
+  "threshold": 0.5,
+  "threshold_policy": "fixed_0.5",
+  "alternative_thresholds": {
+    "fixed_0.5": 0.5,
+    "f2_max": 0.2884395186800383,
+    "sensitivity_0.9": 0.543284021414044,
+    "sensitivity_0.95": 0.339874937611836,
+    "specificity_0.8": 0.5487032348853346,
+    "specificity_0.9": 0.8244681413852806
+  },
+  "calibration": "sigmoid",
+  "protocol": "nested_cv",
+  "best": {
+    "model": "cat",
+    "prep": "native",
+    "candidate": "slower",
+    "params": {
+      "depth": 3,
+      "learning_rate": 0.03,
+      "l2_leaf_reg": 3,
+      "iterations": 199
+    },
+    "inner_validation_log_loss": 0.31594180212357265
+  },
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51
+  ],
+  "git_hash": "da80b9bfef94eab5c17cefd2cf4b0e1232e72a7d",
+  "status": "Experimental candidate; serving artifacts have not been replaced"
+}

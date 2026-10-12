@@ -50,8 +50,8 @@ const ROUTES: Record<Vessel, Landmark[]> = {
 
 export const VESSELS: Vessel[] = ["LAD", "LCX", "RCA"];
 export const VESSEL_META: Record<Vessel, { full: string; course: string }> = {
-  LAD: { full: "Left anterior descending", course: "Anterior interventricular groove → apex" },
-  LCX: { full: "Left circumflex", course: "Left AV groove → lateral and posterior heart" },
+  LAD: { full: "Left anterior descending artery", course: "Anterior interventricular groove → apex" },
+  LCX: { full: "Left circumflex artery", course: "Left AV groove → lateral and posterior heart" },
   RCA: { full: "Right coronary artery", course: "Right AV groove → posterior crux" },
 };
 export const LABEL_FRACTION: Record<Vessel, number> = { LAD: 0.52, LCX: 0.43, RCA: 0.38 };

@@ -1,47 +1,60 @@
-# docs/
+# Technical documentation
 
-MkDocs site sources. Home page: [`index.md`](index.md).
+This folder contains the MkDocs site. [index.md](index.md) is the site home;
+this README is a repository navigation guide and is excluded from the build.
 
-## Build
+## Build and preview
+
+Run from the repository root in an environment with the training/backend
+requirements available for API documentation:
 
 ```bash
-pip install -r docs/requirements-docs.txt
-mkdocs build --strict   # or: mkdocs serve
+python3 -m pip install -r training/requirements.txt -r backend/requirements.txt
+python3 -m pip install -r docs/requirements-docs.txt
+python3 -m mkdocs build --strict
+python3 -m mkdocs serve
 ```
 
-The `--strict` mode treats warnings as errors. All pages must resolve internal
-links, have valid front matter, and pass Markdown linting.
+The strict build checks site generation and treats warnings as errors. It does
+not execute the feature-analysis notebook or rerun model training. Site output
+goes to `site/`, which is ignored by Git.
 
-## Navigation
+## Reading paths
 
-The site is organized as a linear reading path:
+| Task | Start here |
+|---|---|
+| Understand the scope and input data | [Problem formulation](problem-formulation.md), [Dataset](dataset.md) |
+| Understand the implemented feature pipeline | [Feature engineering](feature-engineering.md), [Preprocessing](preprocessing.md) |
+| Compare current models and research results | [Models](models.md), [Evaluation](evaluation.md) |
+| Run an isolated CAD experiment | [CAD nested validation](cad-nested-validation.md) |
+| Integrate the service | [API](api.md), [Backend reference](api-reference/backend.md) |
+| Maintain training code | [Training reference](api-reference/training.md) |
+| Interpret explanations and the dashboard | [Explainability](explainability.md), [Visualization](visualization.md) |
+| Understand architectural choices | [Engineering decisions](engineering-decisions.md), [Multimodal fusion](multimodal-fusion.md) |
 
-1. **Problem formulation** — what we predict and constraints
-2. **Dataset** — data overview, column groups, quirks
-3. **Preprocessing** — cleaning, imputation, encoding tracks
-4. **Feature engineering** — current state + backlog
-5. **Multimodal fusion** — unimodal status + future design
-6. **Models** — families, CV protocol, saved winners
-7. **Evaluation** — held-out metrics, honest interpretation
-8. **Explainability** — algorithm walkthrough, contract, limitations
-9. **Visualization** — 3D heart, dashboard, API surface
-10. **API** — endpoints, schemas, examples
-11. **Engineering decisions** — ADRs
+Repository setup/commands are in `README.md`, `training/README.md`,
+`backend/README.md` and `frontend/README.md`. The dataset README describes the
+executed feature notebook and its exports.
 
-Plus API reference pages (auto-generated from Python docstrings via mkdocstrings).
+## Documentation conventions
 
-## Adding a page
+Keep these distinctions explicit when updating a page:
 
-1. Create a new `.md` file in `docs/`
-2. Add it to the `nav` section in `mkdocs.yml`
-3. Cross-reference from relevant existing pages
-4. Run `mkdocs build --strict` to verify
+- **Raw inputs:** the 54 measurements accepted by the API.
+- **Model features:** the encoded/generated columns produced by a fitted preprocessor.
+- **Training defaults:** CAD logs, LAD counts, LCX ratios/counts and RCA baseline.
+- **Serving artifacts:** currently baseline models; new defaults do not retrofit them.
+- **Exploratory feature results:** three-repeat development CV, selected after inspection.
+- **Serving-model metrics:** the historical 61-row holdouts recorded in `metrics.json`.
+- **Nested results:** a separate CAD model/calibration experiment; feature sets are fixed per run.
 
-## Style guide
+Describe a score with its metric, partition, threshold when applicable and model
+or feature configuration. Do not substitute notebook accuracies for saved-model
+metrics or imply that a feature choice was selected inside nested CV.
 
-- British spelling (colour, normalise) to match existing docs
-- Probability values in decimal form (0.893, not 89.3%)
-- File paths in backticks, class names in backticks
-- Internal links in relative format: `[Page](page.md)`
-- External links with descriptive anchor text
-- Tables for structured data, prose for narrative
+Use relative links between site pages, descriptive link labels, and tables for
+comparisons. Keep repository paths outside `docs/` in code formatting on site
+pages. API fractions remain decimals; label displayed percentages explicitly.
+When adding a page, add it to `mkdocs.yml`, link it from the relevant reading path
+and run the strict build. Review local Markdown links/anchors as well as the
+rendered page when changing headings.

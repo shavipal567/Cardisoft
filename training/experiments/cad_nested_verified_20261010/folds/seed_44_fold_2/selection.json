@@ -1,0 +1,13 @@
+{
+  "candidate": "stopping_only",
+  "params": {
+    "depth": 4,
+    "learning_rate": 0.05,
+    "l2_leaf_reg": 3,
+    "auto_class_weights": "Balanced"
+  },
+  "iterations": 120,
+  "inner_validation_log_loss": 0.3314507169205383,
+  "baseline_inner_validation_log_loss": 0.4043720240767234,
+  "criterion": "Minimum mean unweighted inner-validation log loss; ties: fewer iterations, name"
+}

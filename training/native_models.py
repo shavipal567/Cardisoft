@@ -1,5 +1,9 @@
 """Estimator adapters for transformed NumPy matrices.
 
+LGBMArrayClassifier attaches LightGBM's fitted feature names to dense NumPy
+prediction inputs. Both standalone and voting LightGBM use this adapter to
+avoid sklearn feature-name warnings while preserving probability values.
+
 CatBoost requires categorical columns to have an integer (non-float) dtype,
 but the shared native preprocessor emits a float matrix. :class:`CatBoostNative`
 converts on the way in — in both :meth:`fit` and :meth:`predict_proba` — so
@@ -39,15 +43,25 @@ class CatBoostNative:
             df[j] = df[j].astype(int)
         return df
 
-    def fit(self, X, y, cat_features=None):
+    def fit(self, X, y, cat_features=None, *, eval_set=None,
+            early_stopping_rounds=None, use_best_model=None):
         from catboost import CatBoostClassifier
         if cat_features is not None:
             self.cat_features = list(cat_features)
         elif not isinstance(self.cat_features, list):
             self.cat_features = list(self.cat_features)
         self.model = CatBoostClassifier(**self.params)
+        fit_params = {}
+        if eval_set is not None:
+            fit_params["eval_set"] = (self._frame(eval_set[0]), np.asarray(eval_set[1]))
+        if early_stopping_rounds is not None:
+            if eval_set is None:
+                raise ValueError("Early stopping requires an inner validation set")
+            fit_params["early_stopping_rounds"] = early_stopping_rounds
+        if use_best_model is not None:
+            fit_params["use_best_model"] = use_best_model
         self.model.fit(self._frame(X), np.asarray(y).ravel(),
-                       cat_features=self.cat_features)
+                       cat_features=self.cat_features, **fit_params)
         self.classes_ = np.asarray(self.model.classes_)
         return self
 

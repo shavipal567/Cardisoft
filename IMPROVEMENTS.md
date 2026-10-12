@@ -88,6 +88,12 @@ Relevant sections: **PROBLEM.md §§8–11, 31.1**.
 The five required metrics already exist for all four targets. The following would
 provide stronger supporting evidence:
 
+CAD now has a separate [nested experiment](docs/cad-nested-validation.md) that
+saves ROC/PR, calibration, F2 learning curves, confusion matrices, paired
+patient/group uncertainty and training-only operating thresholds. It preserves
+the serving bundle. The unchecked items below still apply to vessel experiments
+and presentation/integration where noted.
+
 - [ ] Add ROC and precision–recall curves for each target.
 - [ ] Display confusion matrices in Model Info, alongside the existing metric table.
 - [ ] Add calibration plots and held-out Brier scores.
@@ -104,9 +110,6 @@ requirements. Relevant sections: **PROBLEM.md §§4.2, 10–11**.
 
 ### 7. Complete integration checks before adopting new models
 
-- [ ] Add the `vote` model display-name mapping to `training/model_info.py`.
-  Training supports this model family, but the mapping was absent at review time;
-  if it wins, Model Info can fail when reading its metadata.
 - [ ] Verify new preprocessors and model artifacts through live prediction and explanation.
 - [ ] Regenerate evaluation results and the offline Model Info snapshot when artifacts change.
 - [ ] Check that thresholds, model identities, displayed metrics, and report contents
@@ -133,11 +136,18 @@ Relevant sections: **PROBLEM.md §§22–25, 28.2, 31.4–31.5**.
 
 ### 8. Assess missing-input robustness
 
-- [ ] Evaluate representative patterns of omitted inputs, including heavily incomplete forms.
-- [ ] Measure how the current default substitutions affect predictions and performance.
-- [ ] Document limitations of estimates based on sparse inputs.
-- [ ] Continue distinguishing supplied measurements from defaults; input completeness
-  must not be presented as prediction confidence.
+The application now measures frozen-model accuracy for the exact supplied field
+set on held-out records with API defaults substituted for omitted fields. The
+frontend and PDF report distinguish these exploratory scores from coverage and
+individual prediction confidence; empty submissions are flagged. See
+[the method and limitations](docs/evaluation.md#accuracy-with-available-inputs).
+
+- [ ] Run and publish a planned study of representative omission patterns,
+  including heavily incomplete forms and clinically plausible missing-data patterns.
+- [ ] Compare default-substitution strategies using training-only validation;
+  do not select strategies or input subsets using the displayed held-out scores.
+- [ ] Assess missing-input performance on an independent cohort and document
+  where the current exploratory check does not generalise.
 
 This is a recommended robustness check for the optional-input workflow, informed
 by **PROBLEM.md §§7.1, 11, 26–27**.
