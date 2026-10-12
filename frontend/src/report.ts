@@ -85,7 +85,7 @@ export function buildReport(a: {
   const b = band(hi);
   const label = (n: string) => FIELDS.find((f) => f.key === n)?.label ?? n;
   const nameOf = (n: string) => (clinician ? label(n) : plainName(n) !== n ? plainName(n) : label(n));
-  const show = (n: string, raw: number | string) => (patient[n] !== undefined ? fieldValueLabel(n, patient[n]) : String(raw));
+  const show = (n: string, raw: number | string | null) => (patient[n] !== undefined ? fieldValueLabel(n, patient[n]) : String(raw));
 
   // what drove the overall estimate (only inputs that were actually entered)
   const own = expl ? expl.features.filter((f) => !f.assumed) : [];

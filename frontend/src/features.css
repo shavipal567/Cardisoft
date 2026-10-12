@@ -21,9 +21,9 @@
 .pill.mid { background: rgba(242, 195, 107, 0.28); color: #94650f; }
 :root[data-theme="dark"] .pill.mid { color: #f2c36b; }
 
-.plain-main { font-size: 17px; line-height: 1.55; margin: 0 0 10px; }
-.plain-h { margin: 12px 0 4px; font-size: 14px; color: var(--blue-d); }
-.plain-list { margin: 0 0 6px; padding-left: 20px; font-size: 14px; }
+.plain-main { font-size: var(--text-lead); line-height: var(--leading-copy); margin: 0 0 12px; }
+.plain-h { margin: 16px 0 6px; font-size: var(--text-body); color: var(--blue-d); }
+.plain-list { margin: 0 0 6px; padding-left: 20px; font-size: var(--text-body); line-height: var(--leading-copy); }
 .plain-list li { margin-bottom: 4px; }
 .plain-list li span { color: var(--muted); }
 .up-list li::marker { color: #e9657a; }
@@ -56,7 +56,7 @@
 /* Assessment workspace */
 .page { max-width: 1440px; padding: 24px 32px 32px; }
 .top { padding-bottom: 20px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
-.alert { font-size: 12px; border: 1px solid color-mix(in srgb, var(--alert-text) 15%, transparent); }
+.alert { font-size: var(--text-small); line-height: var(--leading-copy); border: 1px solid color-mix(in srgb, var(--alert-text) 15%, transparent); }
 .tabs { margin: 16px 0 24px; border-bottom: 1px solid var(--line); gap: 24px; }
 .tab { padding: 10px 2px 12px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: transparent; }
 .tab.on { border-color: var(--blue-d); box-shadow: none; color: var(--blue-d); }
@@ -69,15 +69,15 @@
 .layout > * { width: 100%; min-width: 0; }
 .card { border-radius: 16px; padding: 24px; }
 .section-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-.section-heading h2 { margin: 0; font-size: 18px; }
-.section-heading .note { margin-top: 2px; }
+.section-heading h2 { margin: 0; font-size: var(--text-section-title); font-weight: 700; }
+.section-heading .note { margin-top: 4px; }
 .step-number { display: grid; place-items: center; flex: none; width: 38px; height: 38px; background: var(--chip); border: 1px solid var(--line); border-radius: 12px; color: var(--blue-d); font-size: 12px; font-weight: 800; }
 .form-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .form-toolbar .section-heading { margin: 0; }
 .form-tools { display: flex; flex-wrap: wrap; gap: 8px; }
 .btn.soft { background: var(--chip); color: var(--blue-d); border: 1px solid var(--input-line); }
-.form-tools .btn { margin: 0; font-size: 12px; padding: 10px 14px; }
-.pdf-box summary span { color: var(--muted); font-size: 11px; font-weight: 400; margin-left: 10px; }
+.form-tools .btn { margin: 0; font-size: var(--text-small); padding: 10px 14px; }
+.pdf-box summary span { display: inline-block; color: var(--muted); font-size: var(--text-caption); font-weight: 400; margin-left: 10px; }
 .pdf-content { padding-top: 14px; }
 .pdf-btn { position: relative; text-align: center; }
 .pdf-input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
@@ -90,17 +90,17 @@
 .group-number { margin-right: 8px; color: var(--blue-d); font-size: 11px; }
 .num-grid { gap: 14px 12px; margin: 8px 0 0; }
 .field input, .field select { min-height: 44px; margin-top: 6px; border-radius: 8px; }
-.field { font-size: 12px; font-weight: 700; }
+.field { font-size: var(--text-small); font-weight: 700; }
 .field-label { margin-top: 14px; }
 .checks { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.check { min-height: 42px; padding: 8px 10px; font-size: 12px; }
+.check { min-height: 42px; padding: 8px 10px; font-size: var(--text-small); }
 .radios .check { flex: 1; justify-content: center; padding: 7px; }
 .form-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 16px; position: sticky; bottom: 12px; z-index: 10; padding: 16px 20px; margin-top: 24px; background: var(--label-bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
 .form-actions .btn { width: auto; min-width: 220px; min-height: 46px; margin: 0; border-radius: 10px; }
 .form-actions .error { flex-basis: 100%; margin: 0; }
-.form-progress { display: grid; grid-template-columns: auto 120px; align-items: center; gap: 4px 16px; font-size: 12px; }
+.form-progress { display: grid; grid-template-columns: auto 120px; align-items: center; gap: 4px 16px; font-size: var(--text-small); font-variant-numeric: tabular-nums; }
 .form-progress b { color: var(--text-strong); }
-.form-progress span { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
+.form-progress span { grid-column: 1 / -1; color: var(--muted); font-size: var(--text-caption); }
 .form-progress progress { width: 120px; height: 6px; border: 0; border-radius: 99px; overflow: hidden; background: var(--line); accent-color: var(--blue-d); }
 .form-progress progress::-webkit-progress-bar { background: var(--line); }
 .form-progress progress::-webkit-progress-value { background: var(--blue-d); border-radius: 99px; }
@@ -120,8 +120,8 @@
 .risk-card { display: flex; flex-direction: column; align-items: stretch; text-align: left; font: inherit; color: var(--text); padding: 20px; }
 .risk-card.sel { background: color-mix(in srgb, var(--card) 95%, var(--accent)); }
 .risk-name { font-size: 13px; min-height: 22px; }
-.risk-card .pct { margin-top: 8px; font-size: 36px; }
-.risk-card .note { font-size: 11px; }
+.risk-card .pct { margin-top: 6px; font-size: var(--text-metric); }
+.risk-card .note { font-size: var(--text-caption); }
 .risk-card .pill { align-self: flex-start; }
 .results-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; margin-top: 20px; align-items: start; }
 .results-detail-grid > * { min-width: 0; margin: 0; }
@@ -175,6 +175,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue-d); 
   width: 100%; min-width: 0; padding: 8px 10px; font: inherit;
   border: 1px solid var(--input-line); background: var(--input); color: var(--text);
 }
+.field input, .field select { font-size: var(--text-body); font-weight: 600; line-height: 1.5; font-variant-numeric: tabular-nums; }
 .field select:focus { outline: 2px solid var(--accent); border-color: transparent; }
 .field { min-width: 0; }
 
@@ -198,11 +199,11 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue-d); 
 .artery-popup { position: absolute; z-index: 6; top: 44px; left: 10px; width: 302px; max-width: calc(100% - 20px);
   display: flex; flex-direction: column; max-height: min(450px, var(--popup-max-height, 450px));
   overflow: hidden; padding: 12px; border: 1px solid var(--input-line); border-top: 3px solid var(--accent); border-radius: 14px;
-  background: var(--label-bg); color: var(--text); box-shadow: 0 10px 30px rgb(13 37 61 / 20%); font-size: 11px; line-height: 1.4; }
+  background: var(--label-bg); color: var(--text); box-shadow: 0 10px 30px rgb(13 37 61 / 20%); font-size: var(--text-caption); line-height: 1.5; }
 .artery-popup-content { min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 .artery-popup-head { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 9px; }
 .artery-popup-head h4 { margin: 0; font-size: 18px; line-height: 1.2; }
-.artery-popup-head p { margin: 2px 0 0; color: var(--muted); font-size: 11px; }
+.artery-popup-head p { margin: 4px 0 0; color: var(--muted); font-size: var(--text-caption); }
 .artery-popup-head button { flex: none; border: 1px solid var(--line); border-radius: 8px; background: var(--chip); color: var(--text);
   width: 36px; height: 36px; font-size: 24px; line-height: 1; cursor: pointer; }
 .artery-popup-head button:hover { background: var(--line); }
@@ -239,12 +240,12 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue-d); 
 .artery-popup-findings { overflow-wrap: anywhere; }
 .artery-popup-findings summary { font-weight: 700; cursor: pointer; }
 .artery-popup-finding { display: grid; gap: 2px; margin-top: 6px; padding-left: 8px; border-left: 2px solid var(--pink-d); }
-.artery-popup-findings .note { margin: 5px 0 0; font-size: 10px; }
+.artery-popup-findings .note { margin: 5px 0 0; font-size: var(--text-caption); }
 .artery-popup-probability { display: flex; flex: none; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 6px;
   margin: 9px 0 0; padding-top: 8px; border-top: 1px solid var(--line); font-size: 11px; }
-.artery-popup-probability strong { font-size: 18px; font-weight: 800; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.artery-popup-probability strong { font-size: var(--text-card-title); font-weight: 700; color: var(--text-strong); font-variant-numeric: tabular-nums; }
 .artery-popup-probability span { flex-basis: 100%; color: var(--text); font-size: 11px; }
-.artery-popup-plaque-note { flex: none; margin: 8px 0 0; padding-top: 7px; border-top: 1px solid var(--line); color: var(--text); font-size: 11px; line-height: 1.4; }
+.artery-popup-plaque-note { flex: none; margin: 8px 0 0; padding-top: 7px; border-top: 1px solid var(--line); color: var(--text); font-size: var(--text-caption); line-height: 1.5; }
 @media (max-width: 600px) {
   .artery-popup { padding: 10px; }
   .artery-popup-head button { width: 40px; height: 40px; }
@@ -281,7 +282,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue-d); 
   border: 1px solid var(--input-line); border-radius: 8px; background: var(--chip); color: var(--text);
   font: inherit; text-align: left; cursor: pointer; }
 .heart-locate-controls b { font-size: 13px; }
-.heart-locate-controls span { font-size: 10px; line-height: 1.4; }
+.heart-locate-controls span { font-size: var(--text-caption); line-height: 1.5; }
 .heart-locate-controls button[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 .heart-opacity-control { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px;
@@ -295,7 +296,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue-d); 
 /* Dedicated anatomy workspace: the model leads, controls stay alongside it. */
 .coronary-viewer { padding: 24px; }
 .coronary-viewer .heart-head { align-items: center; gap: 20px; margin-bottom: 20px; }
-.coronary-viewer .heart-head h3 { font-size: 22px; margin: 0; }
+.coronary-viewer .heart-head h3 { font-size: var(--text-section-title); margin: 0; }
 .coronary-viewer .heart-head .eyebrow { margin: 0 0 6px; font-size: 10px; }
 .heart-header-actions { display: flex; gap: 8px; flex-shrink: 0; }
 .heart-header-actions button, .heart-zoom-controls button { border: 1px solid var(--input-line); border-radius: 8px; background: var(--chip); color: var(--text); font: inherit; font-size: 12px; font-weight: 700; padding: 10px 12px; cursor: pointer; }
@@ -315,21 +316,21 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue-d); 
 .heart-inspector { padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--chip); }
 .heart-inspector-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
 .heart-inspector-heading h4 { margin: 0; color: var(--text-strong); font-size: 12px; }
-.heart-inspector-heading > span { font-size: 10px; color: var(--muted); }
+.heart-inspector-heading > span { font-size: var(--text-caption); color: var(--muted); }
 .heart-inspector .heart-locate-controls { grid-template-columns: minmax(0, 1fr); gap: 8px; margin-bottom: 24px; }
 .heart-inspector .heart-locate-controls button { padding: 12px; gap: 5px; background: var(--card); }
 .artery-card-heading { display: flex; align-items: center; justify-content: space-between; width: 100%; }
 .artery-card-heading b { display: flex; align-items: center; gap: 7px; }
 .artery-card-heading i { width: 8px; height: 8px; border-radius: 50%; }
-.artery-card-heading strong { font-size: 18px; color: var(--text-strong); }
-.heart-locate-controls .artery-card-course { font-size: 10px; color: var(--muted); }
+.artery-card-heading strong { font-size: var(--text-card-title); font-variant-numeric: tabular-nums; color: var(--text-strong); }
+.heart-locate-controls .artery-card-course { font-size: var(--text-caption); color: var(--muted); }
 .heart-inspector .heart-display-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-.heart-inspector .heart-display-controls button { font-size: 10px; padding: 9px 5px; }
+.heart-inspector .heart-display-controls button { font-size: var(--text-caption); padding: 9px 5px; }
 .heart-inspector .heart-opacity-control { padding: 0; border: 0; margin: 16px 0 8px; }
 .heart-opacity-control.inactive { opacity: 0.55; }
 .heart-opacity-control input:disabled { cursor: not-allowed; }
 .heart-inspector .heart-route-control { margin: 18px 0; padding: 12px 0; border-width: 1px 0; border-radius: 0; }
-.heart-mini-legend .legend-labels { font-size: 10px; }
+.heart-mini-legend .legend-labels { font-size: var(--text-caption); }
 .heart-zoom-controls { width: max-content; max-width: calc(100% - 24px); position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 5px; border-radius: 12px; background: var(--label-bg); border: 1px solid var(--line); white-space: nowrap; }
 .heart-zoom-controls button { font-size: 20px; line-height: 1; min-width: 36px; padding: 8px; }
 .heart-zoom-controls span { font-size: 10px; color: var(--muted); }
@@ -368,7 +369,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue-d); 
 .input-accuracy { margin: 18px 0 24px; }
 .input-accuracy-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .input-accuracy-heading h3 { margin: 0 0 6px; }
-.input-accuracy-heading p { margin: 0; font-size: 12px; color: var(--muted); }
+.input-accuracy-heading p { margin: 0; font-size: var(--text-small); color: var(--muted); }
 .input-coverage { display: flex; align-items: baseline; gap: 6px; font-size: 12px; color: var(--muted); }
 .input-coverage b { font-size: 24px; color: var(--blue-d); }
 .input-accuracy-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
@@ -377,7 +378,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue-d); 
 .input-accuracy-value { display: inline-block; font-size: 28px; color: var(--blue-d); margin-right: 8px; }
 .input-accuracy-label, .input-accuracy-target p { font-size: 12px; color: var(--muted); }
 .input-accuracy-target p { margin: 6px 0 12px; }
-.input-accuracy-target dl { margin: 0; font-size: 11px; }
+.input-accuracy-target dl { margin: 0; font-size: var(--text-caption); }
 .input-accuracy-target dl > div { display: flex; justify-content: space-between; gap: 10px; margin-top: 8px; }
 .input-accuracy-target dt { color: var(--muted); }
 .input-accuracy-target dd { margin: 0; text-align: right; font-weight: 700; }
@@ -388,7 +389,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue-d); 
 .input-completeness { border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-top: 20px; background: var(--chip); }
 .completeness-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .completeness-heading h3 { font-size: 14px; margin: 0 0 6px; }
-.completeness-heading p { margin: 0; font-size: 12px; color: var(--muted); }
+.completeness-heading p { margin: 0; font-size: var(--text-small); color: var(--muted); }
 .completeness-heading > strong { font-size: 24px; color: var(--blue-d); }
 .input-completeness progress { width: 100%; height: 8px; margin: 12px 0 4px; accent-color: var(--accent); }
 .input-completeness details { margin-top: 12px; }
@@ -416,7 +417,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue-d); 
 .heart-header-actions { flex-wrap: wrap; justify-content: flex-end; }
 .coronary-label.dimmed { opacity: .45; }
 .heart-route-control { display: grid; gap: 12px; }
-.heart-route-control .note { margin: 0; font-size: 11px; }
+.heart-route-control .note { margin: 0; font-size: var(--text-caption); }
 .heart-header-actions button:disabled { opacity: .5; cursor: not-allowed; }
 .anatomy-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .anatomy-overlay svg { width: 100%; height: 100%; position: absolute; inset: 0; }
@@ -445,7 +446,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue-d); 
 
 /* Field explanations remain separate from the input's accessible label. */
 .field-heading { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 32px; }
-.field-heading > label, .field-heading > .field-label { margin: 0; font-size: 12px; font-weight: 700; color: var(--text); }
+.field-heading > label, .field-heading > .field-label { margin: 0; font-size: var(--text-small); font-weight: 700; line-height: 1.5; color: var(--text); }
 .field-info { display: inline-flex; flex: none; }
 .field-info-button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0;
   border: 1px solid transparent; border-radius: 50%; color: var(--blue-d); background: transparent; cursor: pointer; }
@@ -471,33 +472,33 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue-d); 
 .field-search-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
 .field-search-bar label { flex-basis: 100%; font-weight: 700; font-size: 13px; }
 .field-search-bar input { flex: 1 1 250px; min-width: 0; padding: 12px; min-height: 44px; border: 1px solid var(--input-line); border-radius: 8px; background: var(--card); color: var(--text); font: inherit; font-size: 13px; }
-.field-search-bar .btn { margin: 0; min-height: 40px; font-size: 12px; }
+.field-search-bar .btn { margin: 0; min-height: 40px; font-size: var(--text-small); }
 .input-source-key { margin: 0 0 20px; }
-.form-section > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; cursor: pointer; color: var(--text-strong); font-size: 13px; font-weight: 700; list-style: none; }
+.form-section > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; cursor: pointer; color: var(--text-strong); font-size: var(--text-body); font-weight: 700; list-style: none; }
 .form-section > summary::-webkit-details-marker { display: none; }
 .form-section > summary::before { content: '+'; font-size: 18px; color: var(--blue-d); width: 12px; }
 .form-section[open] > summary::before { content: '−'; }
 .form-section[open] { grid-column: 1 / -1; }
 .form-section-content .num-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .form-section-content > .field, .form-section-content > .field-heading, .form-section-content > .radios { max-width: 640px; }
-.group-completion { margin-left: auto; font-size: 11px; font-weight: 400; color: var(--muted); }
+.group-completion { margin-left: auto; font-size: var(--text-caption); font-weight: 400; font-variant-numeric: tabular-nums; color: var(--muted); }
 .group-completion b { color: var(--alert-text); }
 .form-section-content { min-width: 0; margin: 16px 0 0; padding: 0; border: 0; }
-.field-provenance { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px; font-size: 11px; line-height: 1.5; margin: 7px 0 0; color: var(--muted); font-weight: 400; }
+.field-provenance { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px; font-size: var(--text-caption); line-height: 1.5; margin: 7px 0 0; color: var(--muted); font-weight: 400; }
 .source-badge { border-radius: 5px; padding: 2px 5px; font-weight: 700; border: 1px solid var(--line); background: var(--chip); color: var(--muted); }
 .source-entered { background: var(--green); color: var(--green-d); }
 .source-imported { background: var(--pink); color: var(--pink-d); }
 .source-sample { background: var(--chip); color: var(--blue-d); }
 .field[data-source="imported"] input, .field[data-source="imported"] select { border-style: dashed; }
 .field[data-source="default"] input, .field[data-source="default"] select { background: var(--chip); }
-.field-error { color: var(--alert-text); background: var(--alert-bg); border-radius: 6px; padding: 8px; margin: 7px 0 0; font-size: 11px; line-height: 1.5; font-weight: 500; }
+.field-error { color: var(--alert-text); background: var(--alert-bg); border-radius: 6px; padding: 8px; margin: 7px 0 0; font-size: var(--text-caption); line-height: 1.5; font-weight: 600; }
 .field [aria-invalid="true"] { border-color: var(--alert-text); outline: 1px solid var(--alert-text); }
 .patient-form, .results-panel, .heart-result, .field input, .field select { scroll-margin-top: 80px; }
 .patient-form:focus, .heart-result:focus { outline: none; }
 .risk-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .risk-card.overall-risk { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 32px; padding: 24px; }
 .overall-risk .risk-name { font-size: 18px; min-height: 0; }
-.overall-risk .pct { grid-column: 2; grid-row: 1 / 4; align-self: center; font-size: 52px; margin: 0; }
+.overall-risk .pct { grid-column: 2; grid-row: 1 / 4; align-self: center; font-size: var(--text-primary-metric); margin: 0; }
 .overall-risk .meter { grid-column: 1; margin: 0; max-width: 600px; }
 .overall-risk .pill { grid-column: 1; justify-self: start; }
 .assessment-tools { margin-top: 24px; }
@@ -517,7 +518,14 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue-d); 
   .mobile-section-nav button:disabled { opacity: .45; cursor: not-allowed; }
   .risk-grid { grid-template-columns: minmax(0, 1fr); }
   .risk-card.overall-risk { padding: 18px; gap: 8px 12px; }
-  .overall-risk .pct { font-size: 40px; }
+  .field input, .field select, .field-search-bar input, .voice textarea { font-size: var(--text-lead); }
   .risk-name { min-height: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .loading-spinner { animation: none; } }
+
+/* Narrative cards use the same reading rhythm as their supporting lists. */
+.care-plan > p { font-size: var(--text-body); line-height: var(--leading-copy); margin: 0 0 16px; }
+.care-plan h4 { font-size: var(--text-body); margin: 20px 0 8px; }
+.care-plan li + li { margin-top: 6px; }
+.input-coverage, .input-accuracy-value, .input-accuracy-target dd,
+.completeness-heading > strong, .heart-opacity-control output { font-variant-numeric: tabular-nums; }

@@ -1,6 +1,5 @@
 import type { HeartViewerHandle } from "./components/HeartViewer";
 import { useEffect, useRef, useMemo, useState } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Cell, ResponsiveContainer, ReferenceLine } from "recharts";
 import { predict, explain, getInputDefaults, DEMO_MODE } from "./api";
 import type { PredictResponse, ExplainResponse, Target, Patient, Pred, InputValues } from "./api";
 import { FIELDS, GROUPS, SAMPLE, TARGETS, TARGET_LABELS, riskColor, fieldError, buildPayload } from "./fields";
@@ -24,7 +23,6 @@ import VoiceInput from "./components/VoiceInput";
 import { buildScript } from "./speech/script";
 import type { SectionId } from "./speech/script";
 import type { Parsed } from "./speech/parse";
-import { extractPdfText } from "./pdf/extractText";
 import { extractReport, REPORT_ACCEPT } from "./import/report";
 import { parsePatientFromText } from "./pdf/fieldMap";
 import type { PdfHit } from "./pdf/fieldMap";
@@ -34,8 +32,6 @@ import "./App.css";
 import "./features.css";
 import "./audio.css";
 import "./explanation.css";
-
-const NEUTRAL = 0.005; // |contribution| below this is shown as neutral
 
 type Gender = "" | "Male" | "Female" | "Others";
 
@@ -113,11 +109,6 @@ export default function App() {
   const explainLoading = !!result && !explanations[target] && !explainError;
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [pdfParsing, setPdfParsing] = useState(false);
-  const [pdfFileName, setPdfFileName] = useState("");
-  const [pdfHits, setPdfHits] = useState<PdfHit[]>([]);
-  const [pdfSkipped, setPdfSkipped] = useState<{ key: string; reason: string }[]>([]);
-  const [pdfError, setPdfError] = useState("");
   const [reading, setReading] = useState<SectionId | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [reportParsing, setReportParsing] = useState(false);
@@ -367,16 +358,7 @@ export default function App() {
     : {};
 
   const expl = explanations[target];
-  const chartData = expl
-    ? [...expl.features]
-        .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
-        .slice(0, 8)
-        .map((f) => ({ ...f, label: f.assumed ? `${f.name} (default)` : f.name }))
-    : [];
   const selected = predOf(target);
-
-
-  const axis = dark ? "#93a7bd" : "#7b8da1";
 
   return (
     <div className="page">
