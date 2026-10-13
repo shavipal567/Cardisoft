@@ -72,16 +72,15 @@ loaded from the root `requirements.txt`, which includes `backend/requirements.tx
 
 1. Import this repository in Vercel with the repository root as the project root.
 2. In **Project Settings → Build and Deployment**, select **Services** as the
-   framework. Vercel currently gates Services availability by account; if the
-   option is missing, request Services access from Vercel.
+   framework.
 3. Deploy. The Vercel configuration builds both services; no `VITE_API_URL`
    override is needed because the frontend already calls `/api` by default.
 4. Check `/api/health`, then try an assessment. The API docs are at `/api/docs`.
 
-The backend uses Vercel's Python 3.12 runtime (`.python-version`), with 4 GB
-memory and a 300-second function duration configured for model loading and
-explanations. Vercel Functions are request-based and may cold-start; this is a
-research/demo deployment rather than a persistent server.
+The backend uses Vercel's Python 3.12 runtime (`.python-version`) and a
+300-second function duration for model loading and explanations. Vercel Functions
+are request-based and may cold-start; this is a research/demo deployment rather
+than a persistent server.
 
 ## Engineered features
 

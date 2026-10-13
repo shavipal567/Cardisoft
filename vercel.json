@@ -1,29 +1,29 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "experimentalServices": {
+  "services": {
     "frontend": {
-      "entrypoint": "frontend",
-      "routePrefix": "/",
-      "framework": "vite"
+      "root": "frontend/"
     },
     "backend": {
-      "entrypoint": "backend/main.py",
-      "routePrefix": "/api",
+      "root": ".",
+      "entrypoint": "backend.main:app",
       "framework": "fastapi",
-      "memory": 4096,
-      "maxDuration": 300,
-      "includeFiles": [
-        "backend/**",
-        "training/**",
-        "dataset/dataset.csv"
-      ],
-      "excludeFiles": [
-        "backend/tests/**",
-        "training/tests/**",
-        "training/experiments/**",
-        "dataset/**/*.ipynb",
-        "dataset/engineered_feature_analysis/**"
-      ]
+      "functions": {
+        "backend/main.py": {
+          "maxDuration": 300,
+          "includeFiles": "{training/artifacts/**,dataset/dataset.csv}"
+        }
+      }
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": { "service": "backend" }
+    },
+    {
+      "source": "/(.*)",
+      "destination": { "service": "frontend" }
+    }
+  ]
 }
