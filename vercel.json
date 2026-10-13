@@ -5,14 +5,13 @@
       "root": "frontend/"
     },
     "backend": {
-      "root": ".",
-      "entrypoint": "backend.main:app",
+      "root": "backend/",
+      "entrypoint": "main:app",
       "framework": "fastapi",
       "functions": {
-        "backend/main.py": {
+        "main.py": {
           "maxDuration": 300,
-          "includeFiles": "{training/artifacts/**,dataset/dataset.csv}",
-          "excludeFiles": "frontend/heart-parts-source/**"
+          "includeFiles": "{artifacts/**,data/dataset.csv}"
         }
       }
     }
