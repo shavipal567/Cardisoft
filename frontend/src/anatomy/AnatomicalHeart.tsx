@@ -90,9 +90,11 @@ export default function AnatomicalHeart({ probabilities, selected, onSelect, pro
     }
     for (const vessel of ["LAD", "LCX", "RCA"] as const) {
       const material = materials[vessel];
-      material.color.set(ANATOMY_REGIONS.find(({ id }) => id === vessel)!.color);
-      material.emissive.set(hoveredRegion === vessel ? "#fff0b0" : probabilityColors ? probabilityColor(probabilities[vessel]) : "#000000");
-      material.emissiveIntensity = hoveredRegion === vessel ? .65 : probabilityColors ? (focus && selected === vessel ? .34 : .14) : 0;
+      // Keep the model estimate in the vessel's surface color. Emission is a
+      // separate, neutral interaction cue so nearby probabilities stay honest.
+      material.color.set(probabilityColors ? probabilityColor(probabilities[vessel]) : ANATOMY_REGIONS.find(({ id }) => id === vessel)!.color);
+      material.emissive.set(hoveredRegion === vessel ? "#fff0b0" : selected === vessel ? "#ffffff" : "#000000");
+      material.emissiveIntensity = hoveredRegion === vessel ? .65 : selected === vessel ? (focus ? .3 : .16) : 0;
       const dim = isolate && selected !== vessel && selected !== "CAD";
       material.opacity = dim ? .16 : 1;
       material.transparent = dim;

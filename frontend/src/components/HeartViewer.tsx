@@ -1,5 +1,5 @@
 import { Component, Suspense, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import type { ReactNode, RefObject, Ref } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject, Ref } from "react";
 import { ChevronLeft, ChevronRight, Compass, Download, Heart, Maximize2, Pause, Play, RotateCcw } from "lucide-react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
@@ -213,6 +213,27 @@ export default function HeartViewer({ ref, probabilities, classifications, vesse
     setComparisonPlaying((value) => !value);
   }
   const hoveredAnatomyRegion = hoveredRegion ? regionForId(hoveredRegion) : null;
+  function handleViewerKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    // Shortcuts are active only on the viewer itself, not while a user is
+    // operating one of its buttons or form controls.
+    if (event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return;
+    const key = event.key.toLowerCase();
+    if (key === "arrowleft" || key === "arrowright") {
+      event.preventDefault(); leaveTour(); closePopup();
+      const views = Object.keys(VIEWS) as View[];
+      const index = views.indexOf(view);
+      setView(views[(index + (key === "arrowright" ? 1 : -1) + views.length) % views.length]);
+      setFocused(null); setRevision((n) => n + 1); setRotated(false);
+    } else if (key === "arrowup" || key === "+" || key === "=") {
+      event.preventDefault(); leaveTour(); setZoom((z) => ({ factor: 1 / 1.18, sequence: z.sequence + 1 }));
+    } else if (key === "arrowdown" || key === "-") {
+      event.preventDefault(); leaveTour(); setZoom((z) => ({ factor: 1.18, sequence: z.sequence + 1 }));
+    } else if (key === "1" || key === "2" || key === "3") {
+      event.preventDefault(); locate(VESSELS[Number(key) - 1], false);
+    } else if (key === "0" || key === "home") {
+      event.preventDefault(); resetView();
+    }
+  }
 
   return <div ref={viewer} className={"card coronary-viewer" + (expanded ? " expanded" : "")}
     role={expanded ? "dialog" : undefined} aria-modal={expanded || undefined}
@@ -247,7 +268,7 @@ export default function HeartViewer({ ref, probabilities, classifications, vesse
     <div className="heart-workspace">
     <HeartErrorBoundary>
       <div className="heart-stage">
-      <div ref={viewport} className="canvas-wrap tech-canvas" role="group" tabIndex={-1} aria-label="Interactive coronary artery model">
+      <div ref={viewport} className="canvas-wrap tech-canvas" role="group" tabIndex={0} onKeyDown={handleViewerKeyDown} aria-label="Interactive coronary artery model" aria-describedby="heart-keyboard-help">
         <Canvas frameloop="demand" camera={{ position: VIEWS.Anterior, fov: 40 }} dpr={[1, 1.5]}
           onPointerMissed={(event) => { if (event.type === "click") closePopup(); }}>
           <hemisphereLight args={["#fff4e9", "#54475a", dark ? 1.15 : 1.3]} />
@@ -287,6 +308,7 @@ export default function HeartViewer({ ref, probabilities, classifications, vesse
           <button aria-label="Zoom in" onClick={() => { leaveTour(); setZoom((z) => ({ factor: 1 / 1.18, sequence: z.sequence + 1 })); }}>+</button>
         </div>
       </div>
+      <p className="note heart-keyboard-help" id="heart-keyboard-help">Keyboard: ←/→ change view · ↑/↓ zoom · 1 LAD · 2 LCX · 3 RCA · 0 reset. Focus this model first.</p>
       {popupVessel && <ArteryPopup vessel={popupVessel} probability={probabilities[popupVessel]}
         finding={vesselFindings?.[popupVessel]} probabilityColors={probabilityColors} viewport={viewport} labels={labels} onClose={closePopup} />}
       </div>
@@ -384,7 +406,7 @@ export default function HeartViewer({ ref, probabilities, classifications, vesse
 
     {showRoutes && <p className="note">The coloured LAD, LCX and RCA meshes come from the supplied anatomical OBJ parts. Each included branch shares its parent artery's probability colour. Coronary branching and dominance vary; this reference model is not patient-specific, and the model output does not identify an affected segment. The left coronary stem remains neutral because it has no separate estimate.</p>}
     <p className="note">This anatomical reference model is not a patient scan or clinically validated reconstruction. The table and vessel meshes show whole-artery estimates; colours do not indicate a lesion location, narrowing percentage, plaque composition, blood flow, or ischemia.</p>
-    <p className="note heart-credits">Heart anatomy uses the supplied FMA3.2.1 postnatal OBJ parts. The files do not include license information; confirm the source terms before redistributing the model.</p>
+    <p className="note heart-credits">Heart anatomy uses the supplied FMA3.2.1 postnatal OBJ parts, sourced from <a href="https://lifesciencedb.jp/bp3d/" target="_blank" rel="noreferrer">BodyParts3D/Anatomography on the Life Science Database website</a>. The files do not include license information; confirm the source terms before redistributing the model.</p>
     </details>
   </div>;
 }

@@ -1,5 +1,13 @@
 """Cardisoft backend: leakage-safe CAD + vessel prediction API."""
 
+import os
+import sys
+from pathlib import Path
+
+# Vercel invokes this file as a standalone service entrypoint. Make the
+# backend package directory importable for its existing absolute imports.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -19,7 +27,13 @@ DISCLAIMER = (
     "vessel, not lesion localization."
 )
 
-app = FastAPI(title="Cardisoft API", version="0.1.0")
+API_PREFIX = "/api" if os.environ.get("VERCEL") == "1" else ""
+app = FastAPI(
+    title="Cardisoft API",
+    version="0.1.0",
+    docs_url=f"{API_PREFIX}/docs",
+    openapi_url=f"{API_PREFIX}/openapi.json",
+)
 
 
 @app.exception_handler(RequestValidationError)
@@ -37,12 +51,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.include_router(predict_route.router, tags=["predict"])
-app.include_router(explain_route.router, tags=["explain"])
-app.include_router(model_info_route.router, tags=["model-info"])
+app.include_router(predict_route.router, prefix=API_PREFIX, tags=["predict"])
+app.include_router(explain_route.router, prefix=API_PREFIX, tags=["explain"])
+app.include_router(model_info_route.router, prefix=API_PREFIX, tags=["model-info"])
 
 
-@app.get("/health")
+@app.get(f"{API_PREFIX}/health")
 def health():
     return {"status": "ok", "artifacts_loaded": available(),
             "targets": ["cad", "lad", "lcx", "rca"],

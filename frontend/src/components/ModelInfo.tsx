@@ -42,6 +42,22 @@ export default function ModelInfo() {
           Dataset: {m.dataset.patients} patients, {m.dataset.features} input features ({m.dataset.train} for
           training, {m.dataset.test} held back for the final test).
         </p>
+        <h3>Features used by the models</h3>
+        <p className="note">
+          The saved models use the original patient measurements: demographics and body measurements; medical
+          history and risk factors; blood pressure, pulse and symptoms; ECG findings; laboratory results; and
+          echocardiogram measurements. Categorical answers are encoded and numeric values are imputed and scaled
+          by the saved preprocessing pipeline. Disease labels (CAD, LAD, LCX and RCA) are never used as inputs.
+        </p>
+        <h3>Engineered features</h3>
+        <p className="note">
+          The training code also supports experimental derived features: LDL/HDL, TG/HDL and neutrophil/lymphocyte
+          ratios; unweighted counts of recorded risk factors and ECG findings (not validated clinical scores); and
+          log(1 + value) transforms of triglycerides, fasting blood sugar and ESR. These summarize or transform existing measurements; they are not extra
+          patient-entered fields. The checked-in serving models still use the original baseline feature set, so
+          these engineered features are not currently used for the displayed predictions. Their exploratory results
+          have not been independently validated.
+        </p>
       </div>
 
       <div className="card" style={{ marginTop: 14 }}>
