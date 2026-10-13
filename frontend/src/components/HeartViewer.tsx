@@ -1,31 +1,27 @@
-import { Component, Suspense, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { Component, Suspense, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { ReactNode, RefObject, Ref } from "react";
 import { ChevronLeft, ChevronRight, Compass, Download, Heart, Maximize2, Pause, Play, RotateCcw } from "lucide-react";
-import * as THREE from "three";
 import { Canvas, useThree } from "@react-three/fiber";
-import { Html, useGLTF } from "@react-three/drei";
+import { Html } from "@react-three/drei";
 import type { Target, Vessel } from "../api";
 import { compareProbabilities, probabilityColor, REFERENCE_COLOR, validProbability } from "../viewer/probability";
 import ProbabilityLegend from "./ProbabilityLegend";
 import CameraControls from "../viewer/CameraControls";
 import VesselLabels from "../viewer/VesselLabels";
 import type { LabelElements } from "../viewer/VesselLabels";
-import { taperedTube } from "../anatomy/taperedTube";
 import { createHeartPng, exportHeartPng } from "../viewer/exportPng";
 import LoadingStatus from "./LoadingStatus";
-import AnatomyLabels, { AnatomyProjection } from "./AnatomyLabels";
+import AnatomyLabels from "./AnatomyLabels";
 import type { AnatomyOverlayRef } from "./AnatomyLabels";
 import { ANATOMY_TOUR, VIEWS } from "../anatomy/exploration";
 import type { View } from "../anatomy/exploration";
-import { loadCoronaries, registerHeart, VESSELS, VESSEL_META } from "../anatomy/coronary";
-import { hollowMajorVessels } from "../anatomy/vesselLumens";
+import { VESSELS, VESSEL_META } from "../anatomy/coronary";
 import type { VesselFindings } from "../anatomy/stenosis";
 import { formatModelProbability } from "../anatomy/stenosis";
 import ArteryPopup from "./ArteryPopup";
 import Icon from "./Icon";
-
-const GLB_URL = "/heart.glb";
-useGLTF.preload(GLB_URL);
+import AnatomicalHeart from "../anatomy/AnatomicalHeart";
+import { regionForId } from "../anatomy/regions";
 
 type Capture = (() => HTMLCanvasElement) | null;
 function CaptureView({ onCapture }: { onCapture: (value: Capture) => void }) {
@@ -47,116 +43,13 @@ class HeartErrorBoundary extends Component<{ children: ReactNode }, { error: boo
   }
 }
 
-function Artery({ points, normals, color, selected = false, dimmed = false, proximal = .019, distal = .0085, onSelect }: {
-  points: THREE.Vector3[]; normals?: THREE.Vector3[]; color: string; selected?: boolean; dimmed?: boolean;
-  proximal?: number; distal?: number; onSelect?: () => void;
-}) {
-  const { camera } = useThree();
-  const [geometry, outline, hitArea] = useMemo(() => [
-    taperedTube(points, proximal, distal),
-    taperedTube(points, proximal, distal, .0025),
-    taperedTube(points, proximal, distal, .018),
-  ], [points, proximal, distal]);
-  useEffect(() => () => { geometry.dispose(); outline.dispose(); hitArea.dispose(); }, [geometry, outline, hitArea]);
-  const visibleAt = (point: THREE.Vector3) => {
-    if (!normals) return true;
-    let nearest = 0;
-    for (let i = 1; i < points.length; i++) if (points[i].distanceToSquared(point) < points[nearest].distanceToSquared(point)) nearest = i;
-    return camera.position.clone().sub(points[nearest]).dot(normals[nearest]) > 0;
-  };
-  return <group name="coronary-reference-route" userData={{ probabilityColor: color }}>
-    <mesh geometry={outline} renderOrder={1} raycast={() => {}}>
-      <meshBasicMaterial color={selected ? "#ffffff" : "#302e32"} side={THREE.BackSide}
-        depthWrite={false} toneMapped={false} transparent opacity={dimmed ? .12 : .85} />
-    </mesh>
-    <mesh geometry={geometry} renderOrder={2} raycast={() => {}}>
-      <meshBasicMaterial color={color} toneMapped={false} transparent={dimmed} opacity={dimmed ? .2 : 1} depthWrite={!dimmed} />
-    </mesh>
-    {onSelect && <mesh geometry={hitArea} onClick={(event) => {
-      if (!visibleAt(event.point)) return;
-      event.stopPropagation();
-      if (event.delta <= 4) onSelect();
-    }} onPointerOver={(event) => {
-      if (visibleAt(event.point)) { event.stopPropagation(); (event.nativeEvent.target as HTMLCanvasElement).style.cursor = "pointer"; }
-    }} onPointerOut={(event) => { (event.nativeEvent.target as HTMLCanvasElement).style.cursor = "grab"; }}>
-      <meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} />
-    </mesh>}
-  </group>;
-}
-
-function RegisteredHeart({ probabilities, selected, onSelect, labels, leaders, probabilityColors, focus, showRoutes, opacity, isolate, anatomyOverlay, onCapture }: Pick<Props, "probabilities" | "selected"> & { onSelect: (vessel: Vessel) => void; labels: LabelElements; leaders: RefObject<SVGSVGElement | null>; probabilityColors: boolean; focus: boolean; showRoutes: boolean; opacity: number; isolate: boolean; anatomyOverlay?: AnatomyOverlayRef; onCapture: (value: Capture) => void }) {
-  const gltf = useGLTF(GLB_URL);
-  const invalidate = useThree((state) => state.invalidate);
-  const { heart, materials, lumens } = useMemo(() => {
-    const heart = registerHeart(gltf.scene);
-    const lumens = hollowMajorVessels(heart);
-    const materials = new Map<THREE.Material, { muted: THREE.MeshStandardMaterial; coloured: THREE.Material }>();
-    heart.traverse((object) => {
-      if (!(object instanceof THREE.Mesh)) return;
-      for (const source of Array.isArray(object.material) ? object.material : [object.material]) {
-        if (!materials.has(source)) {
-          // Clone the material, keeping the cached GLB and its textures intact.
-          const coloured = source.clone();
-          if (coloured instanceof THREE.MeshStandardMaterial) {
-            coloured.metalness = 0; coloured.roughness = .78;
-          }
-          coloured.transparent = true;
-          coloured.depthWrite = false;
-          coloured.side = THREE.FrontSide;
-          materials.set(source, {
-            muted: new THREE.MeshStandardMaterial({
-              color: "#aa726d", roughness: .86, metalness: 0, side: THREE.FrontSide,
-              normalMap: source instanceof THREE.MeshStandardMaterial ? source.normalMap : null,
-              bumpMap: source instanceof THREE.MeshStandardMaterial ? source.bumpMap : null,
-              vertexColors: source.vertexColors,
-            }),
-            coloured,
-          });
-        }
-      }
-    });
-    return { heart, materials, lumens };
-  }, [gltf.scene]);
-  useEffect(() => {
-    materials.forEach(({ coloured }) => {
-      coloured.opacity = opacity;
-      const transparent = opacity < 1;
-      if (coloured.transparent !== transparent) {
-        coloured.transparent = transparent;
-        coloured.needsUpdate = true;
-      }
-      coloured.depthWrite = !transparent;
-    });
-    const originals = new Map([...materials].flatMap(([source, variants]) =>
-      [[variants.muted, source], [variants.coloured, source]] as [THREE.Material, THREE.Material][]));
-    heart.traverse((object) => {
-      if (!(object instanceof THREE.Mesh)) return;
-      const swap = (material: THREE.Material) => {
-        const source = originals.get(material) ?? material;
-        const variants = materials.get(source);
-        return variants ? (focus ? variants.muted : variants.coloured) : source;
-      };
-      object.material = Array.isArray(object.material) ? object.material.map(swap) : swap(object.material);
-    });
-    invalidate();
-  }, [heart, materials, focus, opacity, invalidate]);
-  useEffect(() => () => {
-    materials.forEach(({ muted, coloured }) => { muted.dispose(); coloured.dispose(); });
-    lumens.dispose();
-  }, [materials, lumens]);
-  const arteries = useMemo(() => loadCoronaries(), []);
+function RegisteredHeart({ probabilities, selected, onSelect, labels, leaders, probabilityColors, focus, showRoutes, opacity, isolate, anatomyOverlay, onCapture, hoveredRegion, onRegionHover }: Pick<Props, "probabilities" | "selected"> & { onSelect: (vessel: Vessel) => void; labels: LabelElements; leaders: RefObject<SVGSVGElement | null>; probabilityColors: boolean; focus: boolean; showRoutes: boolean; opacity: number; isolate: boolean; anatomyOverlay?: AnatomyOverlayRef; onCapture: (value: Capture) => void; hoveredRegion: string | null; onRegionHover: (region: string | null) => void }) {
   return <>
-    <primitive object={heart} />
+    <AnatomicalHeart probabilities={probabilities} selected={selected as Vessel | "CAD"} onSelect={onSelect}
+      probabilityColors={probabilityColors && showRoutes} focus={focus} opacity={opacity} isolate={isolate} anatomyOverlay={anatomyOverlay}
+      hoveredRegion={hoveredRegion} onRegionHover={onRegionHover} />
     <CaptureView onCapture={onCapture} />
-    {anatomyOverlay && <AnatomyProjection heart={heart} overlay={anatomyOverlay} />}
     {showRoutes && <>
-    <Artery points={arteries.leftMain} color={REFERENCE_COLOR} proximal={.024} distal={.019} dimmed={isolate && selected === "RCA"} />
-    <Artery points={arteries.rightOrigin} proximal={.021} distal={.019}
-      dimmed={isolate && selected !== "RCA" && selected !== "CAD"}
-      color={probabilityColors ? probabilityColor(probabilities.RCA) : REFERENCE_COLOR} onSelect={() => onSelect("RCA")} />
-    {VESSELS.map((name) => <Artery key={name} points={arteries.routes[name].points} normals={arteries.routes[name].normals}
-      color={probabilityColors ? probabilityColor(probabilities[name]) : REFERENCE_COLOR}
-      selected={selected === name} dimmed={isolate && selected !== "CAD" && selected !== name} onSelect={() => onSelect(name)} />)}
     <VesselLabels labels={labels} leaders={leaders} transparent={!focus && opacity < .45} />
     </>}
   </>;
@@ -196,7 +89,8 @@ export default function HeartViewer({ ref, probabilities, classifications, vesse
   const [popupSelection, setPopupSelection] = useState<Vessel | null>(null);
   const closePopup = useCallback(() => setPopupSelection(null), []);
   const popupVessel = showRoutes && popupSelection === selected ? popupSelection : null;
-  const [anatomyLabels, setAnatomyLabels] = useState(false);
+  const [anatomyLabels, setAnatomyLabels] = useState(true);
+  const [hoveredRegion, setHoveredRegion] = useState<string | null>(null);
   const [tour, setTour] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -318,6 +212,7 @@ export default function HeartViewer({ ref, probabilities, classifications, vesse
     if (!comparisonPlaying) focusArtery(selected === "CAD" ? "LAD" : selected);
     setComparisonPlaying((value) => !value);
   }
+  const hoveredAnatomyRegion = hoveredRegion ? regionForId(hoveredRegion) : null;
 
   return <div ref={viewer} className={"card coronary-viewer" + (expanded ? " expanded" : "")}
     role={expanded ? "dialog" : undefined} aria-modal={expanded || undefined}
@@ -360,7 +255,7 @@ export default function HeartViewer({ ref, probabilities, classifications, vesse
           <directionalLight position={[-4, 1, 2]} intensity={.65} color="#dce9ff" />
           <directionalLight position={[1, 3, -4]} intensity={1.4} color="#f8e4dd" />
           <Suspense fallback={<Html center><div className="heart-loading"><LoadingStatus label="Loading 3D heart model…" detail="Preparing the anatomy and artery highlights." /></div></Html>}>
-            <RegisteredHeart probabilities={probabilities} selected={selected} onSelect={selectArtery} labels={labels} leaders={leaders} probabilityColors={probabilityColors} focus={focus} showRoutes={showRoutes} opacity={opacity / 100} isolate={isolate} anatomyOverlay={anatomyLabels ? anatomyOverlay : undefined} onCapture={registerCapture} />
+            <RegisteredHeart probabilities={probabilities} selected={selected} onSelect={selectArtery} labels={labels} leaders={leaders} probabilityColors={probabilityColors} focus={focus} showRoutes={showRoutes} opacity={opacity / 100} isolate={isolate} anatomyOverlay={anatomyLabels ? anatomyOverlay : undefined} onCapture={registerCapture} hoveredRegion={hoveredRegion} onRegionHover={setHoveredRegion} />
           </Suspense>
           <CameraControls view={view} revision={revision} focused={focused} reducedMotion={reducedMotion} zoom={zoom} onRotate={() => { leaveTour(); setRotated(true); }} />
         </Canvas>
@@ -368,6 +263,10 @@ export default function HeartViewer({ ref, probabilities, classifications, vesse
           {VESSELS.map((name) => <line key={name} data-vessel={name} visibility="hidden" />)}
         </svg>}
         {anatomyLabels && <AnatomyLabels overlay={anatomyOverlay} />}
+        {hoveredAnatomyRegion && <aside className="anatomy-hover-card" aria-label={`${hoveredAnatomyRegion.title} information`}>
+          <b>{hoveredAnatomyRegion.title}</b>
+          <span aria-live="polite">{hoveredAnatomyRegion.description}</span>
+        </aside>}
         {showRoutes && VESSELS.map((name) => <button key={name}
           ref={(element) => { if (element) labels.current[name] = element; else delete labels.current[name]; }}
           data-export-label className={"coronary-label" + (selected === name ? " selected" : "") + (isolate && selected !== "CAD" && selected !== name ? " dimmed" : "")}
@@ -443,13 +342,13 @@ export default function HeartViewer({ ref, probabilities, classifications, vesse
           }} />Isolate selected artery</label>
           <p className="note">{isolate && selected !== "CAD" && showRoutes ? `${selected} stays bright; the other two arteries are dimmed.` : "Dim the other arteries while inspecting LAD, LCX or RCA."}</p>
           <label><input type="checkbox" checked={anatomyLabels} onChange={(event) => { leaveTour(); setAnatomyLabels(event.target.checked); }} />Anatomy labels</label>
-          {anatomyLabels && <p className="note">Approximate surface regions. Rotate to see the left atrium at the back. Labels do not show chamber interiors.</p>}
+          {anatomyLabels && <p className="note">Hover over a model region to highlight it and read a short description. Labels follow structures present in the supplied model; chamber interiors are not cut away.</p>}
         </div>
         </details>
         <ProbabilityLegend enabled={probabilityColors && showRoutes} />
       </aside>
     </div>
-    <p className="note heart-reference-note">Illustrative reference paths on the heart surface; not verified native-vessel segmentation or patient-specific anatomy.</p>
+    <p className="note heart-reference-note">Anatomy from the supplied OBJ model. Vessel colours show whole-artery model estimates only; no narrowing location or severity is represented.</p>
     <details className="heart-details">
       <summary>Artery details &amp; anatomy notes</summary>
     <div className="coronary-table-wrap" tabIndex={0} role="region" aria-label="Coronary artery estimates">
@@ -473,14 +372,9 @@ export default function HeartViewer({ ref, probabilities, classifications, vesse
       </table>
     </div>
 
-    {showRoutes && <p className="note">The reference routes illustrate how LAD and LCX share the left main coronary origin; RCA has a separate aortic origin.
-      Use the lateral and posterior views to follow the arteries around the heart. This unsegmented asset does not verify diagonal, septal or marginal branches. They are not reconstructed from the model output.
-      Coronary dominance varies; the distal RCA is not assumed to supply the posterior descending artery. The neutral segment marks the left main, which has no separate model estimate.</p>}
-    <p className="note">This is an illustrative model, not a patient scan or clinically validated reconstruction.
-      The table swatches and optional reference routes show whole-artery estimates. The original asset colours do not encode predictions.</p>
-    <p className="note heart-credits">Chamber and great-vessel reference: <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC1571338/" target="_blank" rel="noreferrer">Cardiac anatomy revisited</a>. Anatomy reference: <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4919754/" target="_blank" rel="noreferrer">normal coronary anatomy</a>.
-      {" "}Heart asset by <a href="https://sketchfab.com/3d-models/anatomically-correct-human-heart-54fa880728d14c11afff78be8721620a" target="_blank" rel="noreferrer">Pigcraft</a>
-      {" "}(<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>); orientation, large vessel openings, and overlays adapted.</p>
+    {showRoutes && <p className="note">The coloured LAD, LCX and RCA meshes come from the supplied anatomical OBJ parts. Each included branch shares its parent artery's probability colour. Coronary branching and dominance vary; this reference model is not patient-specific, and the model output does not identify an affected segment. The left coronary stem remains neutral because it has no separate estimate.</p>}
+    <p className="note">This anatomical reference model is not a patient scan or clinically validated reconstruction. The table and vessel meshes show whole-artery estimates; colours do not indicate a lesion location, narrowing percentage, plaque composition, blood flow, or ischemia.</p>
+    <p className="note heart-credits">Heart anatomy uses the supplied FMA3.2.1 postnatal OBJ parts. The files do not include license information; confirm the source terms before redistributing the model.</p>
     </details>
   </div>;
 }
