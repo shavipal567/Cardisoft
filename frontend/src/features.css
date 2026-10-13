@@ -335,6 +335,13 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); 
 .heart-appearance { border-block: 1px solid var(--line); padding: 12px 0; margin-bottom: 16px; }
 .heart-appearance summary { cursor: pointer; font-size: var(--text-caption); font-weight: 700; color: var(--text-strong); }
 .heart-appearance[open] summary { margin-bottom: 14px; }
+.anatomy-color-legend { margin: 10px 0 14px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
+.anatomy-color-legend summary { cursor: pointer; font-size: var(--text-caption); color: var(--text-strong); }
+.anatomy-color-legend[open] summary { margin-bottom: 9px; }
+.anatomy-color-legend ul { display: grid; gap: 7px; padding: 0; margin: 0; list-style: none; font-size: var(--text-caption); color: var(--text); }
+.anatomy-color-legend li { display: flex; align-items: center; gap: 8px; }
+.anatomy-color-legend li i { flex: 0 0 12px; width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px #0002; }
+.anatomy-color-legend .note { margin: 9px 0 0; }
 .heart-mode-controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 5px; border: 1px solid var(--line); border-radius: 12px; background: var(--chip); }
 .heart-mode-controls button, .comparison-tour-controls button { min-height: 40px; border: 1px solid transparent; border-radius: 8px; padding: 8px; font: inherit; font-size: var(--text-caption); font-weight: 700; color: var(--text); background: transparent; cursor: pointer; }
 .heart-mode-controls button[aria-pressed="true"] { background: var(--card); border-color: var(--accent); color: var(--text-strong); box-shadow: var(--shadow); }

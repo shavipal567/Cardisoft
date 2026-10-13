@@ -324,6 +324,16 @@ export default function HeartViewer({ ref, probabilities, classifications, vesse
           <button aria-pressed={focus} onClick={() => setFocus(true)}>Vessel focus</button>
           <button aria-pressed={!focus} onClick={() => setFocus(false)}>Original colours</button>
         </div>
+        <details className="anatomy-color-legend">
+          <summary>Anatomical colour legend</summary>
+          <ul>
+            <li><i style={{ background: "#C94F4F" }} />Systemic arteries and coronary arteries</li>
+            <li><i style={{ background: "#3267C8" }} />Pulmonary trunk and cardiac veins</li>
+            <li><i style={{ background: "#C77B78" }} />Heart muscle and cardiac tissue</li>
+            <li><i style={{ background: "#E8D8B5" }} />Heart valves and fibrous tissue</li>
+          </ul>
+          <p className="note">Pulmonary arteries carry deoxygenated blood (blue); pulmonary veins carry oxygenated blood (red). This model includes the pulmonary trunk and cardiac veins, but no separately identified pulmonary veins, venae cavae, or epicardial fat.</p>
+        </details>
         <div className={"heart-opacity-control" + (focus ? " inactive" : "")}>
           <label htmlFor="heart-opacity">Heart opacity</label>
           <output htmlFor="heart-opacity">{focus ? "Solid" : `${opacity}%`}</output>
