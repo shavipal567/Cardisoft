@@ -1,13 +1,16 @@
 import type { Vessel } from "../api";
 import { VESSELS } from "../anatomy/coronary";
-import { riskColor } from "../fields";
+import { probabilityColor, PROBABILITY_STOPS } from "./probability";
+import { formatModelProbability } from "../anatomy/stenosis";
 
 export function createHeartPng(viewport: HTMLElement, capture: () => HTMLCanvasElement,
   probabilities: Partial<Record<Vessel, number>>, caption: string) {
   const rect = viewport.getBoundingClientRect();
   const width = rect.width, height = rect.height;
   const output = document.createElement("canvas");
-  output.width = Math.round(width * 2); output.height = Math.round((height + 240) * 2);
+  // Enough room for wrapped captions and credits at narrow phone widths.
+  const footerHeight = width < 360 ? 330 : width < 600 ? 280 : 240;
+  output.width = Math.round(width * 2); output.height = Math.round((height + footerHeight) * 2);
   const ctx = output.getContext("2d");
   if (!ctx) throw new Error("Image export is unavailable in this browser.");
   ctx.scale(2, 2);
@@ -19,7 +22,7 @@ export function createHeartPng(viewport: HTMLElement, capture: () => HTMLCanvasE
   ctx.fillStyle = gradient; ctx.fillRect(0, 0, width, height);
   // Render and copy synchronously, before WebGL discards its drawing buffer.
   ctx.drawImage(capture(), 0, 0, width, height);
-  for (const line of viewport.querySelectorAll<SVGLineElement>(".anatomy-overlay line")) {
+  for (const line of viewport.querySelectorAll<SVGLineElement>(".anatomy-overlay line, .coronary-leaders line")) {
     if (getComputedStyle(line).visibility === "hidden") continue;
     ctx.strokeStyle = "#9bb5c8"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(Number(line.getAttribute("x1")), Number(line.getAttribute("y1")));
@@ -38,7 +41,7 @@ export function createHeartPng(viewport: HTMLElement, capture: () => HTMLCanvasE
     const text = Array.from(label.children).length ? Array.from(label.children).map((node) => node.textContent).join(" ") : label.textContent ?? "";
     ctx.fillText(text, x + 8, y + box.height / 2, Math.max(1, box.width - 16));
   }
-  ctx.globalAlpha = 1; ctx.fillStyle = "#f4f7fa"; ctx.fillRect(0, height, width, 240);
+  ctx.globalAlpha = 1; ctx.fillStyle = "#f4f7fa"; ctx.fillRect(0, height, width, footerHeight);
   ctx.textBaseline = "top"; ctx.fillStyle = "#20394b"; ctx.font = "bold 13px sans-serif";
   ctx.fillText("Cardisoft · Stenosis probability", 14, height + 12);
   ctx.font = "11px sans-serif";
@@ -54,15 +57,20 @@ export function createHeartPng(viewport: HTMLElement, capture: () => HTMLCanvasE
   wrap(caption);
   for (const [i, vessel] of VESSELS.entries()) {
     const p = probabilities[vessel], x = 14 + i * (width - 28) / 3;
-    ctx.fillStyle = p === undefined ? "#94a3b8" : riskColor(p); ctx.fillRect(x, y, 8, 12);
-    ctx.fillStyle = "#20394b"; ctx.fillText(`${vessel}: ${p === undefined ? "—" : `${(p * 100).toFixed(1)}%`}`, x + 13, y);
+    ctx.fillStyle = probabilityColor(p); ctx.fillRect(x, y, 8, 12);
+    ctx.fillStyle = "#20394b"; ctx.fillText(`${vessel}: ${formatModelProbability(p)}`, x + 13, y, (width - 28) / 3 - 16);
   }
   y += 24;
   const legend = ctx.createLinearGradient(14, 0, width - 14, 0);
-  for (let i = 0; i <= 10; i++) legend.addColorStop(i / 10, riskColor(i / 10));
+  for (const stop of PROBABILITY_STOPS) legend.addColorStop(stop.value, stop.color);
   ctx.fillStyle = legend; ctx.fillRect(14, y, width - 28, 7); y += 12;
   ctx.fillStyle = "#20394b"; ctx.font = "10px sans-serif";
-  ctx.fillText("Lower model estimate", 14, y); ctx.textAlign = "right"; ctx.fillText("Higher model estimate", width - 14, y); ctx.textAlign = "left"; y += 20;
+  for (const stop of PROBABILITY_STOPS) {
+    ctx.textAlign = stop.value === 0 ? "left" : stop.value === 1 ? "right" : "center";
+    ctx.fillText(`${stop.value * 100}%`, 14 + stop.value * (width - 28), y);
+  }
+  ctx.textAlign = "left"; y += 18;
+  wrap("Lower → higher probability. Display colours are not clinically validated severity categories.");
   wrap("Model-estimated probability of stenosis, not the percentage of artery narrowing. Illustrative anatomy; no lesion localization.");
   wrap("Heart: Pigcraft / Sketchfab · CC BY 4.0 · Adapted orientation and overlays.");
   return output;

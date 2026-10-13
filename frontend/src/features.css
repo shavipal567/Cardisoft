@@ -230,28 +230,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); 
 .artery-figure-heading span:first-child { color: var(--text); font-weight: 700; }
 .artery-popup-figure .artery-longitudinal { width: 100%; height: 90px; display: block; overflow: hidden; }
 .artery-popup-figure text { fill: var(--text); font-size: 11px; font-weight: 700; }
-.vessel-detail-shadow { fill: none; stroke: #753b44; stroke-width: 42px; stroke-linecap: butt; opacity: .12; }
-.vessel-detail-wall { fill: none; stroke-width: 40px; stroke-linecap: butt; }
-.vessel-detail-highlight { fill: none; stroke: #ffd4c5; stroke-width: 2; stroke-linecap: round; opacity: .75; }
-.vessel-detail-rim { fill: none; stroke: #722d43; stroke-width: 2; opacity: .5; }
-.vessel-detail-lumen { stroke: #e9b1a2; stroke-width: .7; }
-.vessel-detail-lesion { fill: none; stroke: var(--pink-d); stroke-width: 1.2; stroke-dasharray: 3 2; }
-.vessel-detail-plaque { stroke: #b5803b; stroke-width: .7; stroke-linejoin: round; }
-.vessel-detail-plaque-cap { fill: none; stroke: #fff0bd; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
-.vessel-detail-leader { fill: none; stroke: var(--pink-d); stroke-width: 1; }
-.vessel-detail-marker { fill: var(--pink-d); }
-.artery-popup-figure .vessel-detail-number { fill: var(--label-bg); font-size: 10px; }
-.artery-cross-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0 8px; padding: 3px 0; border-top: 1px solid var(--line); }
-.artery-cross-sections > div { display: flex; align-items: center; justify-content: center; gap: 5px; }
-.artery-cross-sections svg { width: 44px; height: 44px; flex: none; }
-.artery-cross-sections span { font-size: 10px; line-height: 1.3; }
 .artery-popup-figure figcaption { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 9px; padding: 3px 5px; font-size: 10px; }
-.artery-popup-figure figcaption span { display: inline-flex; align-items: center; gap: 4px; }
-.artery-popup-figure i { width: 7px; height: 7px; border-radius: 50%; }
-.artery-popup-figure .wall-key i { background: #bf626b; }
-.artery-popup-figure .lumen-key i { background: #ffe9d6; border: 1px solid #c29588; }
-.artery-popup-figure .plaque-key i { background: #e9b65c; }
-.artery-figure-context { margin: 0; padding: 2px 5px 5px; color: var(--text); text-align: center; font-size: 10px; }
 .artery-popup-unavailable p { color: var(--muted); margin: 5px 0 0; }
 .artery-popup-findings { overflow-wrap: anywhere; }
 .artery-popup-findings summary { font-weight: 700; cursor: pointer; }
@@ -261,7 +240,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); 
   margin: 9px 0 0; padding-top: 8px; border-top: 1px solid var(--line); font-size: 11px; }
 .artery-popup-probability strong { font-size: var(--text-card-title); font-weight: 700; color: var(--text-strong); font-variant-numeric: tabular-nums; }
 .artery-popup-probability span { flex-basis: 100%; color: var(--text); font-size: 11px; }
-.artery-popup-plaque-note { flex: none; margin: 8px 0 0; padding-top: 7px; border-top: 1px solid var(--line); color: var(--text); font-size: var(--text-caption); line-height: 1.5; }
+.artery-popup-scope-note { flex: none; margin: 8px 0 0; padding-top: 7px; border-top: 1px solid var(--line); color: var(--text); font-size: var(--text-caption); line-height: 1.5; }
 @media (max-width: 600px) {
   .artery-popup { padding: 10px; }
   .artery-popup-head button { width: 40px; height: 40px; }
@@ -333,7 +312,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); 
     max-width: 100%; box-shadow: var(--shadow-raised); }
   .artery-popup-connector { display: none; }
 }
-.coronary-viewer .tech-canvas { height: max(clamp(560px, 64vh, 700px), var(--heart-inspector-height, 0px)); margin: 0;
+.coronary-viewer .tech-canvas { height: clamp(560px, 68vh, 760px); margin: 0;
   background: radial-gradient(ellipse at 50% 45%, var(--canvas2), var(--canvas1) 78%); }
 .heart-inspector { padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--card-2); }
 .heart-inspector-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
@@ -353,6 +332,40 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); 
 .heart-opacity-control input:disabled { cursor: not-allowed; }
 .heart-inspector .heart-route-control { margin: 18px 0; padding: 12px 0; border-width: 1px 0; border-radius: 0; }
 .heart-mini-legend .legend-labels { font-size: var(--text-caption); }
+.heart-appearance { border-block: 1px solid var(--line); padding: 12px 0; margin-bottom: 16px; }
+.heart-appearance summary { cursor: pointer; font-size: var(--text-caption); font-weight: 700; color: var(--text-strong); }
+.heart-appearance[open] summary { margin-bottom: 14px; }
+.heart-mode-controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 5px; border: 1px solid var(--line); border-radius: 12px; background: var(--chip); }
+.heart-mode-controls button, .comparison-tour-controls button { min-height: 40px; border: 1px solid transparent; border-radius: 8px; padding: 8px; font: inherit; font-size: var(--text-caption); font-weight: 700; color: var(--text); background: transparent; cursor: pointer; }
+.heart-mode-controls button[aria-pressed="true"] { background: var(--card); border-color: var(--accent); color: var(--text-strong); box-shadow: var(--shadow); }
+.heart-mode-controls button:hover, .comparison-tour-controls button:hover { background: var(--surface-hover); }
+.heart-highest { font-size: var(--text-caption); line-height: 1.5; margin: 0 0 12px; padding: 9px 10px; border-left: 2px solid var(--accent); background: var(--chip); color: var(--text); }
+.heart-highest span { display: block; color: var(--muted); margin-top: 4px; }
+.heart-locate-controls .vessel-probability-track { display: block; height: 6px; width: 100%; background: var(--line); border-radius: 4px; overflow: hidden; margin: 3px 0; }
+.vessel-probability-track i { display: block; height: 100%; border-radius: inherit; transition: width .3s ease, background-color .3s ease; }
+.comparison-tour { padding: 12px 0; margin: -12px 0 18px; border-bottom: 1px solid var(--line); }
+.comparison-tour p { font-size: var(--text-caption); margin: 0 0 8px; color: var(--text); }
+.comparison-tour .note { margin: 8px 0 0; color: var(--muted); }
+.comparison-tour-controls { display: grid; grid-template-columns: 38px 1fr 38px; gap: 4px; }
+.comparison-tour-controls button { display: flex; justify-content: center; align-items: center; gap: 6px; background: var(--chip); border-color: var(--line); }
+.comparison-tour-controls button:disabled { cursor: not-allowed; opacity: .5; }
+.probability-legend { font-size: var(--text-caption); color: var(--text); }
+.probability-legend > strong { display: block; margin: 0 0 12px; line-height: 1.5; }
+.probability-ticks { display: flex; justify-content: space-between; gap: 3px; font-size: 10px; font-variant-numeric: tabular-nums; }
+.probability-gradient { height: 9px; border: 1px solid color-mix(in srgb, var(--text) 30%, transparent); border-radius: 6px; margin: 6px 0; }
+.probability-legend .legend-labels { font-size: 10px; gap: 8px; margin-top: 8px; }
+.probability-legend .note { font-size: 11px; margin-bottom: 0; }
+.coronary-leaders { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.coronary-leaders line { stroke: var(--text); stroke-width: 1; opacity: .65; }
+.coronary-label b { display: flex; align-items: center; gap: 6px; }
+.coronary-label b i { width: 8px; height: 8px; border-radius: 50%; border: 1px solid rgb(0 0 0 / .2); }
+.coronary-viewer .tech-canvas canvas { cursor: grab; touch-action: none; }
+.coronary-viewer .tech-canvas canvas:active { cursor: grabbing; }
+@media (max-width: 650px) {
+  .heart-mode-controls { gap: 3px; padding: 4px; }
+  .heart-mode-controls button { padding: 7px 3px; font-size: 11px; }
+  .comparison-tour { margin-top: 0; }
+}
 .heart-zoom-controls { width: max-content; max-width: calc(100% - 24px); position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 5px; border-radius: 12px; background: var(--bar); border: 1px solid var(--line); white-space: nowrap; box-shadow: var(--shadow); }
 .heart-zoom-controls button { font-size: 20px; line-height: 1; min-width: 36px; padding: 8px; }
 .heart-zoom-controls span { font-size: 10px; color: var(--muted); }
@@ -360,7 +373,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); 
 .heart-details { border-top: 1px solid var(--line); padding-top: 16px; }
 .heart-details > summary { font-size: var(--text-caption); font-weight: var(--weight-heading); cursor: pointer; color: var(--text-strong); }
 .coronary-viewer.expanded { position: fixed; inset: 16px; z-index: 1000; overflow: auto; background: var(--card); box-shadow: 0 0 0 100vmax rgb(0 0 0 / 55%); }
-.coronary-viewer.expanded .tech-canvas { height: max(560px, calc(100dvh - 210px), var(--heart-inspector-height, 0px)); }
+.coronary-viewer.expanded .tech-canvas { height: max(560px, calc(100dvh - 290px)); }
 .heart-header-actions button:focus-visible, .heart-view-controls button:focus-visible,
 .heart-locate-controls button:focus-visible, .heart-display-controls button:focus-visible,
 .heart-zoom-controls button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }

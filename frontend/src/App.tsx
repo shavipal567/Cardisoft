@@ -1,5 +1,5 @@
 import type { HeartViewerHandle } from "./components/HeartViewer";
-import { useEffect, useRef, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowDown,
@@ -56,12 +56,13 @@ import type { Parsed } from "./speech/parse";
 import { extractReport, REPORT_ACCEPT } from "./import/report";
 import { parsePatientFromText } from "./pdf/fieldMap";
 import type { PdfHit } from "./pdf/fieldMap";
-import HeartViewer from "./components/HeartViewer";
 import { formatModelProbability } from "./anatomy/stenosis";
 import "./App.css";
 import "./features.css";
 import "./audio.css";
 import "./explanation.css";
+
+const HeartViewer = lazy(() => import("./components/HeartViewer"));
 
 type Gender = "" | "Male" | "Female" | "Others";
 
@@ -789,6 +790,7 @@ export default function App() {
 
                 <div className="results-detail-grid">
                 <div id="heart-anatomy" ref={anatomyRef} tabIndex={-1} className="heart-result">
+                  <Suspense fallback={<LoadingStatus label="Loading 3D heart viewer…" detail="Preparing interactive coronary anatomy." />}>
                   <HeartViewer ref={heartViewer}
                     probabilities={probabilities}
                     classifications={classifications}
@@ -799,6 +801,7 @@ export default function App() {
                     onSelect={setTarget}
                     dark={dark}
                   />
+                  </Suspense>
                 </div>
                 <div className={"one-col" + (reading === "factors" ? " reading" : "")}>
                   {explainError && <p className="error" role="alert">Explanation unavailable: {explainError}</p>}

@@ -56,7 +56,12 @@ export const VESSEL_META: Record<Vessel, { full: string; course: string }> = {
 };
 export const LABEL_FRACTION: Record<Vessel, number> = { LAD: 0.52, LCX: 0.43, RCA: 0.38 };
 export const ARTERY_RADIUS = 0.018;
-export const SURFACE_OFFSET = 0.022;
+export const SURFACE_OFFSET = 0.008;
+
+// Proportions of this educational asset, not patient diameter measurements.
+export function vesselRadius(t: number, proximal = .019, distal = .0085) {
+  return THREE.MathUtils.lerp(proximal, distal, t * t * (3 - 2 * t));
+}
 
 export function buildCoronaries(heart: THREE.Object3D) {
   heart.updateMatrixWorld(true);
@@ -69,8 +74,8 @@ export function buildCoronaries(heart: THREE.Object3D) {
     const angles = new THREE.CatmullRomCurve3(landmarks.map((point) => new THREE.Vector3(point[3], 0, 0)));
     const points: THREE.Vector3[] = [];
     const normals: THREE.Vector3[] = [];
-    for (let i = 0; i <= 96; i++) {
-      const t = i / 96;
+    for (let i = 0; i <= 160; i++) {
+      const t = i / 160;
       const seed = seeds.getPoint(t);
       const angle = angles.getPoint(t).x;
       const outward = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
@@ -82,6 +87,22 @@ export function buildCoronaries(heart: THREE.Object3D) {
       const normal = outward;
       points.push(hit.point.clone().addScaledVector(normal, SURFACE_OFFSET));
       normals.push(normal);
+    }
+    // Smooth the scan's high-frequency surface ridges along the casting normal.
+    // Constrain the tube centre to a fraction of its radius above the original
+    // surface: the vessel remains seated, including at its tapered distal end.
+    const surface = points.map((p, i) => p.clone().addScaledVector(normals[i], -SURFACE_OFFSET));
+    const lengths = [0];
+    for (let i = 1; i < points.length; i++) lengths.push(lengths[i - 1] + points[i].distanceTo(points[i - 1]));
+    for (let pass = 0; pass < 5; pass++) {
+      const previous = points.map((p) => p.clone());
+      for (let i = 0; i < points.length; i++) {
+        const radius = vesselRadius(lengths[i] / lengths.at(-1)!);
+        const mean = previous[Math.max(0, i - 1)].clone().addScaledVector(previous[i], 2)
+          .add(previous[Math.min(points.length - 1, i + 1)]).multiplyScalar(.25);
+        const gap = THREE.MathUtils.clamp(mean.sub(surface[i]).dot(normals[i]), radius * .3, radius * .75);
+        points[i].copy(surface[i]).addScaledVector(normals[i], gap);
+      }
     }
     return [name, { points, normals }];
   })) as Record<Vessel, { points: THREE.Vector3[]; normals: THREE.Vector3[] }>;
