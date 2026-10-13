@@ -23,6 +23,7 @@ goes to `site/`, which is ignored by Git.
 
 | Task | Start here |
 |---|---|
+| Tour the interface and try sample API calls | [Product tour](showcase.md) |
 | Understand the scope and input data | [Problem formulation](problem-formulation.md), [Dataset](dataset.md) |
 | Understand the implemented feature pipeline | [Feature engineering](feature-engineering.md), [Preprocessing](preprocessing.md) |
 | Compare current models and research results | [Models](models.md), [Evaluation](evaluation.md) |

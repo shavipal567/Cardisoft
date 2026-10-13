@@ -28,6 +28,60 @@
   margin: 0.2rem 0;
 }
 
+/* Brand lockup reuses the heart and stethoscope artwork from the frontend. */
+.cardisoft-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: fit-content;
+  margin: 0 0 1rem;
+}
+
+.cardisoft-brand-heart {
+  display: block;
+  width: 2.8rem;
+  height: 3.2rem;
+  object-fit: contain;
+}
+
+.cardisoft-brand-copy {
+  position: relative;
+  padding-right: 1.2rem;
+}
+
+.cardisoft-brand-word {
+  color: var(--md-default-fg-color);
+  font-size: 1.55rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.cardisoft-brand-word span {
+  color: var(--cardisoft-teal);
+}
+
+.cardisoft-brand-tag {
+  color: var(--md-default-fg-color--light);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+}
+
+.cardisoft-brand-bow {
+  position: absolute;
+  top: -0.45rem;
+  right: -0.5rem;
+  width: 1.65rem;
+  height: 1.8rem;
+  object-fit: contain;
+  transform: rotate(14deg);
+}
+
+.cardisoft-brand-tour {
+  margin-top: -0.4rem;
+}
+
 .cardisoft-badges {
   display: flex;
   flex-wrap: wrap;

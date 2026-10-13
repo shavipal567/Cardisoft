@@ -7,6 +7,11 @@ patient-specific explanations and a schematic 3D heart.
 Built for the Multimodal AI Hackathon 2026, Track A. This is a research prototype;
 its predictions are not a medical diagnosis or lesion-location estimate.
 
+![Cardisoft assessment form in labeled offline demo mode](docs/assets/img/screenshots/assessment-form.png)
+
+See the [product tour](docs/showcase.md) for more screenshots, a guided workflow,
+anatomy and report-import examples, and sample API requests.
+
 ## Current implementation
 
 | Area | Current state |

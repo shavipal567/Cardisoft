@@ -38,6 +38,20 @@ width; generated feature names and the chosen feature set are exported in the
 schema and metadata. Historical artifacts without a feature-set field remain
 baseline models. Saved-model curve regeneration follows recorded metadata.
 
+![Histograms of the eight engineered features on the CAD development partition](assets/img/dataset/feature-distributions.png)
+
+*Engineered-feature distributions for the 242 CAD development records. The
+feature set is deterministic; these plots describe this cohort and do not show
+the distribution of every target-specific training partition.*
+
+The log transforms reduce the long right tails of TG, FBS, and ESR in the
+development data:
+
+![Raw and log1p histograms for triglycerides, fasting blood sugar, and ESR](assets/img/dataset/raw-vs-log-labs.png)
+
+*`log1p` compresses extreme values while preserving their order. It does not
+add measurements or apply a clinical cutoff.*
+
 ## Evidence and limitations
 
 Defaults were chosen from the exploratory accuracy comparison on three repeats
@@ -49,6 +63,19 @@ The original notebook ranks log loss and gives different winners. See the
 [complete comparison](evaluation.md#engineered-feature-comparison) for both
 metrics and the exact development-only protocol. The checked-in serving
 models remain baseline models and do not include these accuracy gains.
+
+![Heatmap of rank-biserial associations between engineered features and CAD, LAD, LCX, and RCA labels](assets/img/dataset/target-associations.png)
+
+*Unadjusted associations estimated on target-specific development partitions.
+These values are exploratory associations, not causal effects, feature
+importance scores, or independent validation results.*
+
+![Spearman correlation heatmap for the engineered features on the CAD development partition](assets/img/dataset/engineered-correlations.png)
+
+*Some engineered columns overlap: for example, `TG_HDL_ratio` and `log1p_TG`
+have a Spearman correlation of 0.87 in this partition. Derived values are
+therefore evaluated as feature sets rather than assumed to provide independent
+signals.*
 
 The legacy training search still selects models by ROC-AUC/F1. Its reported
 winner score is a selection score. The CAD nested protocol accepts an explicit
