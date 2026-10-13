@@ -22,11 +22,11 @@ bundle. Restart the service after replacing artifacts; models and explanation
 backgrounds are cached. Input-dependent accuracy reads the packaged
 `backend/data/dataset.csv` copy.
 
-These serving files are snapshots of the repository-level training outputs. After
-retraining, copy `training/inference.py`, `training/preprocessing.py`,
-`training/model_info.py`, the complete `training/artifacts/` directory, and
-`dataset/dataset.csv` into the corresponding paths under `backend/` before
-deploying the updated backend bundle.
+These serving files are snapshots of the repository-level training outputs. The
+ensemble adapter modules are also required because saved joblib models refer to
+their Python module names when loading. After retraining, refresh those copied
+runtime modules, the complete `training/artifacts/` directory, and
+`dataset/dataset.csv` under `backend/` before deploying the updated bundle.
 
 ## Inputs and engineered features
 

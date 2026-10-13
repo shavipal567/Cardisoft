@@ -1,4 +1,4 @@
-"""Inference helper shared by training smoke tests and backend/.
+"""Self-contained backend inference helper for the frozen serving models.
 
 Loads frozen artifacts from artifacts/<target>/
 (preprocessor + model). No fitting here.
@@ -8,6 +8,7 @@ import os
 import hashlib
 import io
 import json
+import logging
 from functools import lru_cache
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from preprocessing import ALL_INPUT_FEATURES, clean_dataframe, get_output_featur
 HERE = Path(__file__).resolve().parent
 DEFAULT_ARTIFACTS = HERE / "artifacts"
 TARGET_KEYS = ("cad", "lad", "lcx", "rca")
+logger = logging.getLogger(__name__)
 
 
 def artifacts_dir() -> Path:
@@ -57,6 +59,7 @@ def available() -> bool:
         _load_all()
         return True
     except Exception:
+        logger.exception("Could not load model bundles from %s", artifacts_dir())
         return False
 
 

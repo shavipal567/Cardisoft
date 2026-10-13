@@ -11,7 +11,7 @@
       "functions": {
         "main.py": {
           "maxDuration": 300,
-          "includeFiles": "{artifacts/**,data/dataset.csv}"
+          "includeFiles": "{artifacts/**,data/dataset.csv,native_models.py,voting.py,stacking.py,ensemble_cv.py}"
         }
       }
     }
