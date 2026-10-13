@@ -7,11 +7,13 @@ import type { VesselFinding } from "../anatomy/stenosis";
 import { vesselDetail } from "../anatomy/vesselDetail";
 import { popupPosition } from "../viewer/popupPosition";
 import ArterySchematic from "./ArterySchematic";
+import { probabilityColor, REFERENCE_COLOR } from "../viewer/probability";
 
 interface Props {
   vessel: Vessel;
   probability?: number;
   finding?: VesselFinding;
+  probabilityColors?: boolean;
   viewport: RefObject<HTMLDivElement | null>;
   labels: RefObject<Partial<Record<Vessel, HTMLButtonElement>>>;
   onClose: () => void;
@@ -23,15 +25,15 @@ function restoreFocus(trigger: RefObject<HTMLElement | null>, viewport: RefObjec
   else viewport.current?.focus({ preventScroll: true });
 }
 
-export default function ArteryPopup({ vessel, probability, finding, viewport, labels, onClose }: Props) {
+export default function ArteryPopup({ vessel, probability, finding, probabilityColors = true, viewport, labels, onClose }: Props) {
   const titleId = useId();
-  const plaqueNoteId = `${titleId}-plaque-note`;
+  const scopeNoteId = `${titleId}-scope-note`;
   const panel = useRef<HTMLDivElement>(null);
   const connector = useRef<SVGPathElement>(null);
   const close = useRef<HTMLButtonElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
   const data = useMemo(() => normalizeVesselFindings({ [vessel]: finding })?.[vessel], [vessel, finding]);
-  const drawing = useMemo(() => vesselDetail(vessel, data?.lesions), [vessel, data]);
+  const drawing = useMemo(() => vesselDetail(vessel), [vessel]);
 
   useLayoutEffect(() => {
     const popup = panel.current, container = viewport.current;
@@ -52,7 +54,12 @@ export default function ArteryPopup({ vessel, probability, finding, viewport, la
       };
       const label = labels.current[vessel];
       const labelVisible = label && getComputedStyle(label).visibility !== "hidden";
-      const anchor = labelVisible ? relativeRect(label) : { left: bounds.width / 2, top: bounds.height / 2, width: 0, height: 0 };
+      if (!labelVisible) {
+        popup.dataset.docked = "true";
+        connector.current?.setAttribute("d", "");
+        return;
+      }
+      const anchor = relativeRect(label);
       const obstacles = [...container.querySelectorAll<HTMLElement>(".coronary-label, .anatomy-label")]
         .filter((element) => getComputedStyle(element).visibility !== "hidden").map(relativeRect);
       popup.style.setProperty("--popup-max-height", `${Math.max(120, container.clientHeight - 110)}px`);
@@ -124,20 +131,21 @@ export default function ArteryPopup({ vessel, probability, finding, viewport, la
   return <>
     <svg className="artery-popup-connector" aria-hidden="true"><path ref={connector} /></svg>
     <div ref={panel} id="artery-popup" className="artery-popup" data-vessel={vessel}
-    role="dialog" aria-modal="false" aria-labelledby={titleId} aria-describedby={plaqueNoteId}>
+    role="dialog" aria-modal="false" aria-labelledby={titleId} aria-describedby={scopeNoteId}>
     <div className="artery-popup-head">
       <div><h4 id={titleId}>{vessel}</h4><p>{VESSEL_META[vessel].full}</p></div>
       <button ref={close} type="button" aria-label={`Close ${vessel} vessel details`} onClick={dismissAndFocus}>×</button>
     </div>
     <div className="artery-popup-content" aria-live="polite" aria-atomic="true">
-      <ArterySchematic vessel={vessel} drawing={drawing} describedBy={plaqueNoteId} />
+      <p className="note">{VESSEL_META[vessel].course}</p>
+      <ArterySchematic vessel={vessel} drawing={drawing} describedBy={scopeNoteId} color={probabilityColors ? probabilityColor(probability) : REFERENCE_COLOR} />
       {data ? <details className="artery-popup-findings" open={data.lesions.length === 1}>
-        <summary>Reported stenosis · {data.lesions.length} {data.lesions.length === 1 ? "segment" : "segments"}</summary>
+        <summary>Separately supplied findings · {data.lesions.length} {data.lesions.length === 1 ? "segment" : "segments"}</summary>
         {data.lesions.map((lesion, index) => <div key={index} className="artery-popup-finding">
           <strong>Segment {index + 1}</strong>
           <span>Location: {lesion.location ?? (lesion.start_fraction !== undefined ? `${Math.round(lesion.start_fraction * 100)}–${Math.round(lesion.end_fraction! * 100)}% along reference route` : "unavailable")}</span>
           <span>Diameter narrowing: <b>{lesion.diameter_stenosis_percent === undefined ? "unavailable" : `${lesion.diameter_stenosis_percent}%`}</b></span>
-          {lesion.start_fraction === undefined && <span className="muted">Position on vessel unavailable; segment not drawn.</span>}
+          {lesion.start_fraction === undefined && <span className="muted">Position on vessel unavailable; no location is inferred.</span>}
         </div>)}
         {data.source && <p className="note">Source: {data.source}</p>}
       </details> : <details className="artery-popup-findings artery-popup-unavailable">
@@ -146,6 +154,6 @@ export default function ArteryPopup({ vessel, probability, finding, viewport, la
       </details>}
     </div>
     <p className="artery-popup-probability" aria-label="Model-estimated probability of stenosis">Model-estimated probability <strong>{formatModelProbability(probability)}</strong><span>Not a measurement of diameter narrowing.</span></p>
-    <p id={plaqueNoteId} className="artery-popup-plaque-note">Illustrative visualization only. The plaque shown does not represent this patient's actual plaque burden, location, or degree of stenosis.</p>
+    <p id={scopeNoteId} className="artery-popup-scope-note">This model does not locate stenosis or estimate narrowing, plaque, blood flow or ischemia. The reference route is not patient-specific anatomy.</p>
   </div></>;
 }

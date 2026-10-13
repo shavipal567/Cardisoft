@@ -12,7 +12,7 @@ const sourceURL = new URL('../src/anatomy/registration.ts', import.meta.url);
 const source = await readFile(sourceURL, 'utf8');
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText
   .replace('"three"', JSON.stringify(new URL('../node_modules/three/build/three.module.js', import.meta.url).href));
-const { registerHeart, buildCoronaries, SURFACE_OFFSET } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+const { registerHeart, buildCoronaries, vesselRadius } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 const asset = await readFile(new URL('../public/heart.glb', import.meta.url));
 const jsonLength = asset.readUInt32LE(12);
 const json = JSON.parse(asset.subarray(20, 20 + jsonLength).toString());
@@ -34,8 +34,8 @@ const { LAD, LCX, RCA } = anatomy.routes;
 assert.ok(LAD.points[0].equals(LCX.points[0]), 'LAD and LCX must share a bifurcation');
 assert.ok(LAD.points.at(-1).y < -1, 'LAD must reach the apex');
 assert.ok(LAD.points.every((p) => p.z > 0), 'LAD must remain anterior');
-assert.ok(LCX.points[48].x > 0 && LCX.points.at(-1).z < 0, 'LCX must wrap left to posterior');
-assert.ok(RCA.points[48].x < 0 && RCA.points.at(-1).z < 0, 'RCA must wrap right to posterior');
+assert.ok(LCX.points[80].x > 0 && LCX.points.at(-1).z < 0, 'LCX must wrap left to posterior');
+assert.ok(RCA.points[80].x < 0 && RCA.points.at(-1).z < 0, 'RCA must wrap right to posterior');
 const ray = new THREE.Raycaster();
 for (const [name, route] of Object.entries(anatomy.routes)) {
   for (let i = 0; i < route.points.length; i++) {
@@ -44,7 +44,7 @@ for (const [name, route] of Object.entries(anatomy.routes)) {
     if (i) assert.ok(p.distanceTo(route.points[i - 1]) < .15, `${name}: discontinuous surface path`);
     ray.set(p, route.normals[i].clone().negate());
     const hit = ray.intersectObject(heart, true)[0];
-    assert.ok(hit && Math.abs(hit.distance - SURFACE_OFFSET) < .006, `${name}: overlay left the surface`);
+    assert.ok(hit && hit.distance >= 0 && hit.distance < vesselRadius(0) * .8, `${name}: overlay left the surface`);
   }
 }
 const vector = (p) => p.toArray().map((v) => Number(v.toFixed(7)) || 0);

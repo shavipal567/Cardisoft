@@ -22,6 +22,8 @@ const coronary = await moduleUrl('../src/anatomy/coronary.ts', {
   three, './registration': registration,
   './heart-coronaries.json': `data:text/javascript;base64,${Buffer.from(`export default ${registered}`).toString('base64')}`,
 });
+const probability = await moduleUrl('../src/viewer/probability.ts');
+const { probabilityColor, compareProbabilities, PROBABILITY_STOPS, UNAVAILABLE_COLOR } = await import(probability);
 const stenosis = await moduleUrl('../src/anatomy/stenosis.ts');
 const detail = await moduleUrl('../src/anatomy/vesselDetail.ts', { three, './coronary': coronary, './stenosis': stenosis });
 const position = await moduleUrl('../src/viewer/popupPosition.ts');
@@ -36,29 +38,42 @@ const { default: ArteryPopup } = await import(await moduleUrl('../src/components
   react: pathToFileURL(require.resolve('react')).href,
   'react/jsx-runtime': pathToFileURL(require.resolve('react/jsx-runtime')).href,
   '../anatomy/coronary': coronary, '../anatomy/stenosis': stenosis,
-  '../anatomy/vesselDetail': detail, '../viewer/popupPosition': position, './ArterySchematic': schematic,
+  '../viewer/probability': probability, '../anatomy/vesselDetail': detail, '../viewer/popupPosition': position, './ArterySchematic': schematic,
 }));
 const render = (vessel, finding, probability = .81) => renderToStaticMarkup(createElement(ArteryPopup, {
   vessel, finding, probability, viewport: { current: null }, labels: { current: {} }, onClose: () => {},
 }));
 
-test('each vessel has distinct reference geometry and explicitly illustrative plaque without inventing clinical lesions', () => {
+test('all artery popups show a whole-vessel estimate with no fabricated plaque or spatial markers', () => {
   const routes = ['LAD', 'LCX', 'RCA'].map(vessel => vesselDetail(vessel));
   assert.equal(new Set(routes.map(route => route.centerline)).size, 3);
-  for (const [i, vessel] of ['LAD', 'LCX', 'RCA'].entries()) {
-    assert.deepEqual(routes[i].markers, []);
-    assert.equal(routes[i].plaqueIsExample, true);
-    assert.equal(routes[i].plaques.length, 1);
+  for (const vessel of ['LAD', 'LCX', 'RCA']) {
     const html = render(vessel);
     assert.match(html, /Location &amp; diameter narrowing not supplied/);
-    assert.match(html, /Model-estimated probability/);
     assert.match(html, /81.0%/);
-    assert.doesNotMatch(html, /Reported segment|vessel-detail-lesion/);
-    assert.match(html, /vessel-detail-plaque/);
-    assert.match(html, /Example location only/);
-    assert.match(html, /Illustrative visualization only\. The plaque shown does not represent this patient&#x27;s actual plaque burden, location, or degree of stenosis\./);
+    assert.match(html, /one uniform vessel colour/);
+    assert.match(html, /does not locate stenosis/);
+    assert.doesNotMatch(html, /vessel-detail-plaque|vessel-detail-lesion|Example location|Illustrative stenosis|<circle|<ellipse/);
   }
-  assert.equal(new Set(routes.map(route => route.plaques[0].path)).size, 3);
+});
+
+test('probability colours interpolate continuously and reject unavailable outputs instead of inventing risk', () => {
+  for (const stop of PROBABILITY_STOPS) assert.equal(probabilityColor(stop.value), stop.color);
+  for (const invalid of [undefined, null, NaN, Infinity, -1, 1.01, '0.5']) assert.equal(probabilityColor(invalid), UNAVAILABLE_COLOR);
+  const rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  for (const value of [.2, .25, .4, .5, .6, .75, .8]) {
+    const before = rgb(probabilityColor(value - .00001)), after = rgb(probabilityColor(value + .00001));
+    assert.ok(before.every((v, i) => Math.abs(v - after[i]) <= 1));
+  }
+});
+
+test('highest probability respects raw values, ties, zero and partial or invalid predictions', () => {
+  assert.deepEqual(compareProbabilities({ LAD: .2, LCX: .8, RCA: .5 }), { highest: ['LCX'], complete: true });
+  assert.deepEqual(compareProbabilities({ LAD: .8, LCX: .8, RCA: .5 }), { highest: ['LAD', 'LCX'], complete: true });
+  assert.deepEqual(compareProbabilities({ LAD: 0, LCX: 0, RCA: 0 }).highest, ['LAD', 'LCX', 'RCA']);
+  assert.deepEqual(compareProbabilities({ LAD: .80001, LCX: .80002, RCA: .5 }).highest, ['LCX']);
+  assert.deepEqual(compareProbabilities({ LAD: .4, LCX: NaN, RCA: 5 }), { highest: ['LAD'], complete: false });
+  assert.deepEqual(compareProbabilities({}), { highest: [], complete: false });
 });
 
 test('missing, empty and invalid findings do not imply a healthy artery or create a lesion', () => {
@@ -83,89 +98,52 @@ test('anatomy probability formatting preserves the same estimate and rejects inv
   }
 });
 
-test('probability never changes cutaway or explanatory cross-section geometry', () => {
+test('probability changes colour and the displayed number, never vessel geometry', () => {
   for (const vessel of ['LAD', 'LCX', 'RCA']) {
     const low = render(vessel, undefined, .01), high = render(vessel, undefined, .99);
-    const figure = html => html.match(/<figure[\s\S]*?<\/figure>/)[0];
-    assert.equal(figure(low), figure(high));
-    assert.match(low, /Reference<br\/>segment/);
-    assert.match(low, /Illustrative<br\/>stenosis/);
-    assert.match(low, /Explanatory cross-sections, not patient measurements/);
-    assert.match(low, /Arterial wall/);
+    const paths = html => [...html.matchAll(/<path d="([^"]+)"/g)].map(m => m[1]);
+    assert.deepEqual(paths(low), paths(high));
+    assert.match(low, new RegExp(probabilityColor(.01)));
+    assert.match(high, new RegExp(probabilityColor(.99)));
     assert.match(low, /Not a measurement of diameter narrowing/);
-    // No apparent clinical percentage is printed in either illustration.
-    assert.doesNotMatch(figure(low), /\d+(?:\.\d+)?%/);
+    assert.match(low, /1.0%/); assert.match(high, /99.0%/);
   }
 });
 
-test('reported lumen measurements remain independent of illustrative plaque', () => {
-  const lesion = { start_fraction: .2, end_fraction: .6, diameter_stenosis_percent: 75 };
-  assert.equal(lumenRadiusFraction(.1, [lesion]), 1);
-  assert.equal(lumenRadiusFraction(.8, [lesion]), 1);
-  assert.equal(lumenRadiusFraction(.4, [lesion]), .25);
-  assert.equal(lumenRadiusFraction(.4, [{ ...lesion, diameter_stenosis_percent: 100 }]), 0);
-  assert.equal(lumenRadiusFraction(.4, [{ ...lesion, diameter_stenosis_percent: 0 }]), 1);
-  assert.equal(lumenRadiusFraction(.4, [{ start_fraction: .2, end_fraction: .6 }]), 1);
-  assert.equal(lumenRadiusFraction(.4, [{ location: 'mid', diameter_stenosis_percent: 75 }]), 1);
-  const plain = vesselDetail('LAD');
-  const measured = vesselDetail('LAD', [lesion]);
-  assert.notEqual(measured.lumen, plain.lumen);
-  assert.equal(measured.markers.length, 1);
-  assert.equal(vesselDetail('LAD', [{ diameter_stenosis_percent: 75 }]).markers.length, 0);
+test('explicitly supplied measurements stay separate and never deform the probability diagram', () => {
+  const finding = { source: 'Synthetic measured fixture', lesions: [{ location: 'distal', start_fraction: .2, end_fraction: .6, diameter_stenosis_percent: 65 }] };
+  const html = render('RCA', finding, .2);
+  assert.match(html, /Separately supplied findings/);
+  assert.match(html, /65%/); assert.match(html, /20.0%/);
+  assert.match(html, /Synthetic measured fixture/);
+  const paths = value => [...value.matchAll(/<path d="([^"]+)"/g)].map(m => m[1]);
+  assert.deepEqual(paths(html), paths(render('RCA', undefined, .2)));
+  assert.doesNotMatch(html, /vessel-detail-plaque|vessel-detail-lesion|Example location/);
+  // The independent data-normalization utility still preserves measured narrowing.
+  assert.equal(lumenRadiusFraction(.4, finding.lesions), .35);
 });
 
-test('partial findings keep unknown clinical locations and severities distinct from the plaque example', () => {
-  const located = render('LCX', { source: 'Test fixture', lesions: [{ start_fraction: .1, end_fraction: .3 }] });
-  assert.match(located, /Numbered markers: reported segments/);
-  assert.match(located, /Diameter narrowing: <b>unavailable/);
-  const measured = render('RCA', { lesions: [{ location: 'distal', diameter_stenosis_percent: 65 }] }, .2);
-  assert.match(measured, /65%/);
-  assert.match(measured, /20.0%/);
-  assert.match(measured, /Position on vessel unavailable/);
-  assert.doesNotMatch(measured, /vessel-detail-lesion/);
-  assert.match(measured, /Example location only/);
-});
-
-test('plaque follows supplied segment boundaries, preserves measurements and never substitutes an example for reported zero narrowing', () => {
-  const lesions = [{ start_fraction: .1, end_fraction: .3, diameter_stenosis_percent: 75 }];
-  const before = structuredClone(lesions);
-  const drawing = vesselDetail('LCX', lesions);
-  assert.equal(drawing.plaqueIsExample, false);
-  assert.equal(drawing.plaques.length, 2);
-  assert.deepEqual(lesions, before);
-  assert.equal(lumenRadiusFraction(.2, lesions), .25);
-  for (const plaque of drawing.plaques) {
-    assert.doesNotMatch(plaque.path, /NaN|Infinity/);
-    const vertices = [...plaque.path.matchAll(/[ML](-?[\d.]+),(-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
-    const half = vertices.length / 2;
-    // Each deposit closes against its attached wall at both ends, while its
-    // inner surface protrudes into the reference lumen between those endpoints.
-    assert.deepEqual(vertices[0], vertices.at(-1));
-    assert.deepEqual(vertices[half - 1], vertices[half]);
-    assert.ok(vertices.slice(0, half).some((v, i) => Math.hypot(v[0] - vertices.at(-1-i)[0], v[1] - vertices.at(-1-i)[1]) > 1));
-  }
-  const other = vesselDetail('LCX', [{ ...lesions[0], start_fraction: .7, end_fraction: .9 }]);
-  assert.notEqual(other.plaques[0].path, drawing.plaques[0].path);
-  for (const zero of [[{ ...lesions[0], diameter_stenosis_percent: 0 }], [{ diameter_stenosis_percent: 0 }]]) {
-    assert.deepEqual(vesselDetail('LAD', zero).plaques, []);
-  }
-  const html = render('LCX', { lesions }, .34);
-  assert.match(html, /75%/);
-  assert.match(html, /34.0%/);
-  assert.doesNotMatch(html, /Example location/);
-});
-
-test('short, endpoint and multiple lesions remain finite with visible numbered markers', () => {
-  const drawing = vesselDetail('RCA', [
-    { start_fraction: 0, end_fraction: .002, diameter_stenosis_percent: 90 },
-    { start_fraction: .999, end_fraction: 1, diameter_stenosis_percent: 100 },
-  ]);
-  assert.equal(drawing.markers.length, 2);
-  assert.doesNotMatch(drawing.lumen, /NaN|Infinity/);
-  for (const marker of drawing.markers) {
-    assert.ok(marker.path.length > 100);
-    assert.ok(marker.labelX >= 9 && marker.labelX <= 291);
-    assert.ok(marker.labelY >= 9 && marker.labelY <= 155);
+test('tapered tubes have smooth decreasing radii, finite normals and a shared left-main junction', async () => {
+  const { loadCoronaries } = await import(coronary);
+  const { taperedTube } = await import(await moduleUrl('../src/anatomy/taperedTube.ts', { three, './registration': registration }));
+  const THREE = await import(three);
+  const anatomy = loadCoronaries();
+  assert.ok(anatomy.routes.LAD.points[0].equals(anatomy.routes.LCX.points[0]));
+  assert.ok(anatomy.leftMain.at(-1).equals(anatomy.routes.LAD.points[0]));
+  for (const { points } of Object.values(anatomy.routes)) {
+    const geometry = taperedTube(points), vertices = geometry.getAttribute('position');
+    const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal');
+    const rings = vertices.count / 13 - 1;
+    let previous = Infinity;
+    for (let i = 0; i <= rings; i++) {
+      const radius = new THREE.Vector3().fromBufferAttribute(vertices, i * 13).distanceTo(curve.getPointAt(i / rings));
+      assert.ok(radius <= previous + 1e-6, 'taper must not create a localized constriction');
+      assert.ok(radius >= .00849 && radius <= .01901);
+      previous = radius;
+    }
+    assert.ok(Array.from(geometry.getAttribute('normal').array).every(Number.isFinite));
+    assert.equal(geometry.getAttribute('color'), undefined, 'no spatial probability colours');
+    geometry.dispose();
   }
 });
 

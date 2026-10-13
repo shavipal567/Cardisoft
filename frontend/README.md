@@ -212,105 +212,98 @@ a reanalysis notice. Verify the unavailable message with an older backend or
 missing validation dataset, and the separate demo-mode message with mock mode.
 The regular backend must be restarted to load changes to the validation service.
 
-The 3D viewer uses the existing `public/heart.glb` asset, registered so +X is
-patient left, +Y superior and +Z anterior. Surface-fitted artery paths replace
-the old ellipsoid overlays: LAD follows the anterior interventricular groove;
-LCX and RCA follow the left/right AV grooves toward the posterior heart. LAD
-and LCX share a left-main origin. Small branches and variants are omitted.
-Anterior, posterior and both lateral camera presets accompany rotation/zoom
-and accessible artery selection. Hidden labels are occluded by the heart.
-Rendering runs on demand; surface raycasting occurs offline. The default display
-shows all three coronary reference highlights and positional labels on a muted
-heart surface. Original colours restores the textured appearance; the highlights
-checkbox can hide the overlays. Locate buttons select each artery and orient the
-camera (left lateral for LCX, anterior for LAD/RCA). The current GLB
-has 14 generic mesh chunks sharing one material, with no vessel segmentation or
-anatomical names. It cannot establish native LAD/LCX/RCA identity by itself.
+## Coronary visualization
 
-“Show LAD, LCX and RCA highlights” controls the separately
-constructed paths and their labels, enabled by default. These are illustrations, not native-vessel
-identifications. In that mode, Vessel focus mutes the heart to make the outlined
-routes easier to follow; Original colours restores the asset's materials.
-Overlay colours are unlit so they match the risk legend; a white outline
-identifies the selected artery. Depth testing still hides posterior segments.
-The source asset and cached artery paths are unchanged by these display modes.
+The viewer retains `public/heart.glb` (Pigcraft, CC BY 4.0), its existing
+orientation and large-vessel openings. The registered coordinate frame is
++X patient left, +Y superior, +Z anterior. LAD follows an illustrative anterior
+interventricular course; LCX and RCA wrap around the left/right AV grooves.
+LAD and LCX meet at a shared left-main origin. RCA has a separate origin.
 
-`npm run anatomy:register` regenerates `src/anatomy/heart-coronaries.json` from
-`src/anatomy/registration.ts` and the GLB. `npm run anatomy:check` checks asset
-and landmark fingerprints, surface contact, continuity and route direction.
-Regenerate after replacing the asset or changing its registered landmarks.
+The asset contains generic mesh chunks, not verified vessel segmentation.
+Its small branches cannot be reliably identified from those chunks. Diagonal,
+septal, obtuse marginal and distal dominant branches are therefore not invented.
+Coronary dominance is unknown, and the RCA is not assumed to supply the PDA.
+Branch reconstruction would require an anatomically reviewed, separately
+identified coronary tree with an appropriate license. This reference heart is
+not a patient scan or a clinically validated reconstruction. Course references:
+[normal coronary anatomy](https://pmc.ncbi.nlm.nih.gov/articles/PMC4919754/) and
+[coronary variants and dominance](https://pmc.ncbi.nlm.nih.gov/articles/PMC11242126/).
 
-The asset metadata credits Pigcraft under CC BY 4.0; attribution and the
-anatomical reference appear in the viewer. The registration is illustrative,
-not clinically validated or patient-specific, and does not locate lesions.
-Its direct import still makes the initial JavaScript bundle large.
+`registration.ts` projects 161 samples per artery onto the actual heart surface
+and smooths small surface irregularities within a radius-constrained envelope.
+The rendered tubes taper smoothly from proximal to distal, independently of all
+predictions. The left main and right origin meet the corresponding tube radii.
+Materials have nonmetallic myocardial shading, soft fill and directional lights.
+Original colours preserves the asset's texture; Vessel focus uses muted tissue.
 
-Original colours uses cloned heart materials at user-adjustable opacity (0–100%, initially 69%) with depth writing
-disabled; coronary highlights remain opaque. Source GLB materials/textures are
-not mutated. The muted Vessel focus mode remains opaque.
+Run `npm run anatomy:register` after changing landmarks or the asset;
+`npm run anatomy:check` verifies fingerprints, shared origins, continuity,
+reference directions and surface contact. It validates registration consistency,
+not clinical anatomical accuracy.
 
-The anatomy workspace places the viewport next to an artery/appearance inspector
-on desktop, stacking the inspector below the model on tablet/mobile. Artery cards
-show probabilities and orient the camera on selection. Zoom buttons complement
-mouse/touch controls; Reset view restores the anterior camera. Expanded view
-locks background scrolling, contains keyboard focus and closes with Escape.
-The artery table and reference/credit notes live in a collapsible details panel.
-The opacity slider remains visible but disabled in the opaque Vessel focus mode.
+### Probability integrity
 
-## Anatomy exploration and image export
+`viewer/probability.ts` is the shared colour scale for routes, labels, comparison
+bars, popup diagrams and image exports. Blue, cyan, yellow, orange and red anchors
+at 0%, 25%, 50%, 75%, 100% interpolate continuously in sRGB. They are visualization
+ranges, not validated severity categories. Each vessel has one unlit uniform
+colour so lighting cannot create apparent spatial probability hotspots.
+The left main remains neutral because it has no separate model estimate.
 
-- **Artery details popup** opens from an LAD/LCX/RCA path, label, inspector card
-  or table button. It highlights the selection and projects that artery's existing
-  registered route into a compact SVG. Switching arteries replaces the popup;
-  selecting it again, clicking outside, the close button or Escape dismisses it.
-  The panel follows the projected label and stays within the viewport, clear of
-  the orientation badges and zoom controls. Content scrolls on smaller screens.
-  The SVG does not allocate another WebGL renderer or rebuild the heart mesh.
-- **Lesion data** is optional. The current prediction backend supplies only
-  whole-vessel probabilities/classes, so the popup explicitly reports unavailable
-  stenosis location and diameter measurements. No lesion is inferred from these
-  probabilities, and a uniform reference lumen does not mean the vessel is healthy.
-  A `/predict` response may supply `vessel_findings`, keyed by `LAD`, `LCX`, `RCA`.
-  Each entry has optional `source` text and a `lesions` array. Lesions may contain
-  `location` text, `diameter_stenosis_percent` (a measured number from 0 to 100),
-  and `start_fraction`/`end_fraction` (0–1, increasing arc-length coordinates
-  explicitly mapped to the registered reference route). Only mapped clinical segments
-  are numbered; measured narrowing is retained when a diameter measurement is
-  supplied. Text-only locations and measurements without a mapping remain
-  readable but are not placed at invented clinical coordinates. Invalid,
-  empty or omitted data is treated as unavailable. Reference geometry and the
-  taper shape remain illustrative; the app does not reconstruct a patient scan.
-- **Illustrative plaque** adds a subtle yellow-orange wall deposit to the same
-  SVG route. At measured segments it occupies the space between the reference
-  wall and the existing narrowed lumen. Without a measured diameter, a modest
-  example deposit illustrates the mechanism; without a mapped location, the
-  caption explicitly says “Example location only.” Reported zero
-  narrowing is never replaced with a plaque example. Plaque geometry is never
-  inserted into clinical findings or used to change probabilities or measurements.
-  The exact illustrative-plaque disclaimer stays visible below the scrollable
-  content. Neither plaque segmentation nor volume or composition is inferred.
-- **Isolate selected artery** keeps the selected LAD, LCX or RCA bright and dims
-  the other reference paths and their labels. Selecting another artery transfers
-  the focus. Enabling isolation from the overall CAD estimate locates LAD first.
-- **Anatomy labels** adds the four chamber surface regions, aorta, pulmonary trunk
-  and apex. Labels follow the camera, avoid artery buttons, and use conservative
-  direction-based visibility; the left atrium appears from behind. These are
-  manually registered external landmarks projected onto the mesh, not verified
-  chamber segmentation or a view of chamber interiors. Seeds and tour copy live
-  in `src/anatomy/exploration.ts`. The anatomical orientation is informed by
-  [Cardiac anatomy revisited](https://pmc.ncbi.nlm.nih.gov/articles/PMC1571338/).
-- **Guided tour** moves through five steps covering the anterior overview, LAD,
-  lateral LCX, posterior surface, and right-sided RCA. Next/Back changes presets
-  and selection; Finish/End restores the pre-tour display settings and preset.
-  Manual camera or artery selection exits the tour at the current view.
-- **Export PNG** downloads the current rendered view with visible artery and
-  anatomy labels, orientation, estimates, colour legend, display mode and asset
-  credit. It works in expanded view and on mobile. The WebGL frame is rendered
-  and copied synchronously, then DOM callouts are composited at twice the display
-  resolution; no continuous drawing-buffer preservation or server upload is
-  required. A browser error is shown if rendering or encoding fails.
+Missing, nonfinite and out-of-range probabilities are unavailable, never zero.
+The highest-estimate indicator uses unrounded values, includes exact ties, and
+identifies incomplete comparisons. New prediction props update numbers, colours
+and comparisons without rebuilding geometry or resetting the camera.
 
-Manual check: select each artery with isolation on; toggle anatomy labels;
-inspect front/back/side views; run the tour forward/backward and finish; export
-both a labelled view and a view with overlays hidden. Check exported labels,
-legend and clipping on desktop/mobile and in expanded view.
+There are no localized stenosis markers, plaque examples, narrowed lumens,
+blood-flow animations or inferred segment probabilities. The popup displays a
+reference route and a whole-vessel estimate. Optional `vessel_findings` supplied
+independently of the prediction are retained as labelled text with their source;
+they do not alter geometry or create spatial markers. The current backend does
+not supply these measurements.
+
+### Controls and performance
+
+- **Anatomy** restores the opaque textured heart with overlays hidden.
+- **Probability** shows all three reference vessels and estimates.
+- **Isolate** emphasizes the selected artery while dimming the other two.
+- **Comparison** shows all estimates on a common 0–100% bar scale, the highest
+  estimate (including ties), and an animated LAD → LCX → RCA tour. Play/Pause,
+  Previous and Next work without opening popups or moving keyboard focus.
+  Each step lasts 5.5 seconds; manual navigation pauses playback. Hidden tabs
+  and offscreen viewers suspend automatic steps.
+
+Select arteries through their 3D paths, anchored labels, comparison cards or
+reference table. Cards focus the appropriate anterior or lateral view. Smooth
+orbital transitions travel around the heart, including between opposite views.
+Reduced-motion preferences disable camera animation. Dragging interrupts a
+transition; zoom buttons and pinch/scroll remain available.
+
+Appearance & labels contains the original display, opacity, highlight, isolation
+and anatomy-label controls, plus the probability colour toggle. Turning probability
+colours off uses a neutral reference colour while keeping numeric predictions.
+The legend includes percentage ticks and readable text in both themes.
+
+The five-step guided anatomy tour, expanded view with keyboard focus containment,
+Escape dismissal, and PNG/report capture remain available. Guided-tour completion
+restores the prior display and camera preset. Popup cards follow projected vessel
+labels, docking below narrow canvases or when their anchor rotates out of sight.
+No second WebGL context is created for the popup's SVG projection.
+
+The 3D module loads lazily when results need it, keeping Three.js out of the initial
+form bundle. Rendering uses demand frames and capped pixel density. Geometry is memoized and
+disposed on unmount. Label visibility uses conservative surface-facing culling
+instead of repeated raycasts against the million-triangle mesh. DOM callouts and
+screen-space leaders are updated only on rendered frames. Anatomy landmark
+projection remains a one-time operation when those labels are enabled.
+
+PNG captures include visible labels and their leaders, the camera/display mode,
+all numeric estimates, the same five-colour scale, interpretation notes and asset
+credit. The footer accommodates narrow mobile widths. WebGL is captured
+synchronously without keeping a permanent drawing buffer.
+
+Validation: `npm test`, `npm run anatomy:check`, `npm run build`, `npm run lint`.
+Browser checks should cover each mode and artery, ties and unavailable values,
+live probability updates, play/pause/previous/next, all camera presets, direct
+path picking, both themes, mobile layout, keyboard dismissal and exported PNGs.
