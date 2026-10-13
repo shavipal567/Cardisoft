@@ -9,7 +9,7 @@ import { ocrAssets } from './ocrAssets.js'
 // Keep the supplied OBJ source files in the project root. Serve them in dev and
 // emit them as static assets for production without converting or duplicating them.
 function heartObjAssets(): Plugin {
-  const source = resolve(fileURLToPath(new URL('.', import.meta.url)), '../BP51782_FMA3_2_1_inference_isa_FMA67135_Postnatal_anatomical_structure')
+  const source = resolve(fileURLToPath(new URL('.', import.meta.url)), 'heart-parts-source')
   const files = readdirSync(source).filter((file) => file.endsWith('.obj'))
   return {
     name: 'heart-obj-assets',
