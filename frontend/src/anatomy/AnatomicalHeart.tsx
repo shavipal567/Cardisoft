@@ -5,7 +5,7 @@ import type { ThreeEvent } from "@react-three/fiber";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import type { Vessel } from "../api";
 import parts from "./heartParts.json";
-import { probabilityColor, REFERENCE_COLOR } from "../viewer/probability";
+import { probabilityColor } from "../viewer/probability";
 import type { AnatomyOverlayRef } from "../components/AnatomyLabels";
 import { AnatomyProjection } from "../components/AnatomyLabels";
 import { ANATOMY_REGIONS, regionForPart } from "./regions";
@@ -31,12 +31,12 @@ export default function AnatomicalHeart({ probabilities, selected, onSelect, pro
   const { heart, materials } = useMemo(() => {
     const heart = new THREE.Group();
     heart.name = "FMA postnatal anatomical heart (OBJ parts)";
-    const regionMaterials = Object.fromEntries(ANATOMY_REGIONS.map(({ id }) => [id, new THREE.MeshStandardMaterial({ color: "#a96160", roughness: .88, metalness: 0 })])) as Record<string, THREE.MeshStandardMaterial>;
+    const regionMaterials = Object.fromEntries(ANATOMY_REGIONS.map(({ id, color }) => [id, new THREE.MeshStandardMaterial({ color, roughness: .88, metalness: 0 })])) as Record<string, THREE.MeshStandardMaterial>;
     const materials = {
       regions: regionMaterials,
-      LAD: new THREE.MeshStandardMaterial({ color: REFERENCE_COLOR, roughness: .56, metalness: 0 }),
-      LCX: new THREE.MeshStandardMaterial({ color: REFERENCE_COLOR, roughness: .56, metalness: 0 }),
-      RCA: new THREE.MeshStandardMaterial({ color: REFERENCE_COLOR, roughness: .56, metalness: 0 }),
+      LAD: new THREE.MeshStandardMaterial({ color: ANATOMY_REGIONS.find(({ id }) => id === "LAD")!.color, roughness: .62, metalness: 0 }),
+      LCX: new THREE.MeshStandardMaterial({ color: ANATOMY_REGIONS.find(({ id }) => id === "LCX")!.color, roughness: .62, metalness: 0 }),
+      RCA: new THREE.MeshStandardMaterial({ color: ANATOMY_REGIONS.find(({ id }) => id === "RCA")!.color, roughness: .62, metalness: 0 }),
     };
 
     loaded.forEach((source, index) => {
@@ -79,8 +79,9 @@ export default function AnatomicalHeart({ probabilities, selected, onSelect, pro
 
   useEffect(() => {
     const faded = Math.min(1, Math.max(0, opacity));
-    for (const [id, material] of Object.entries(materials.regions)) {
-      material.color.set(focus ? "#8d7774" : "#a96160");
+    for (const { id, color } of ANATOMY_REGIONS) {
+      const material = materials.regions[id];
+      material.color.set(focus ? "#8d7774" : color);
       material.emissive.set(hoveredRegion === id ? "#ffd36a" : "#000000");
       material.emissiveIntensity = hoveredRegion === id ? .65 : 0;
       material.opacity = isolate ? .14 : faded;
@@ -89,9 +90,9 @@ export default function AnatomicalHeart({ probabilities, selected, onSelect, pro
     }
     for (const vessel of ["LAD", "LCX", "RCA"] as const) {
       const material = materials[vessel];
-      material.color.set(probabilityColors ? probabilityColor(probabilities[vessel]) : REFERENCE_COLOR);
-      material.emissive.set(hoveredRegion === vessel ? "#fff0b0" : "#000000");
-      material.emissiveIntensity = hoveredRegion === vessel ? .65 : 0;
+      material.color.set(ANATOMY_REGIONS.find(({ id }) => id === vessel)!.color);
+      material.emissive.set(hoveredRegion === vessel ? "#fff0b0" : probabilityColors ? probabilityColor(probabilities[vessel]) : "#000000");
+      material.emissiveIntensity = hoveredRegion === vessel ? .65 : probabilityColors ? (focus && selected === vessel ? .34 : .14) : 0;
       const dim = isolate && selected !== vessel && selected !== "CAD";
       material.opacity = dim ? .16 : 1;
       material.transparent = dim;
