@@ -6,15 +6,13 @@ import * as THREE from "three";
 import type { Vessel } from "../api";
 import { VIEWS } from "../anatomy/exploration";
 import type { View } from "../anatomy/exploration";
-import { loadCoronaries } from "../anatomy/coronary";
+import { HEART_PART_CENTERS } from "../anatomy/heartPartAnchors";
 
 interface Props {
   view: View; revision: number; focused: Vessel | null; reducedMotion: boolean;
   zoom: { factor: number; sequence: number }; onRotate: () => void;
 }
-const routes = loadCoronaries().routes;
-const centers = Object.fromEntries(Object.entries(routes).map(([name, route]) =>
-  [name, new THREE.Box3().setFromPoints(route.points).getCenter(new THREE.Vector3())])) as Record<Vessel, THREE.Vector3>;
+const centers = HEART_PART_CENTERS;
 
 export default function CameraControls({ view, revision, focused, reducedMotion, zoom, onRotate }: Props) {
   const { camera, size, invalidate } = useThree();

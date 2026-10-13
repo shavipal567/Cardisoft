@@ -460,6 +460,11 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); 
 .anatomy-overlay line { stroke: #9bb5c8; stroke-width: 1; visibility: hidden; }
 .anatomy-label { position: absolute; visibility: hidden; padding: 6px 8px; border-radius: 6px;
   border: 1px solid var(--input-line); background: var(--card); color: var(--text); font-size: var(--text-caption); line-height: 1.2; white-space: nowrap; }
+.anatomy-hover-card { position: absolute; z-index: 4; left: 12px; bottom: 66px; display: grid; gap: 4px;
+  width: min(330px, calc(100% - 24px)); padding: 10px 12px; border: 1px solid var(--input-line); border-radius: 10px;
+  background: var(--card); color: var(--text); box-shadow: var(--shadow); font-size: var(--text-caption); line-height: 1.45;
+  pointer-events: none; }
+.anatomy-hover-card b { color: var(--text-strong); }
 .heart-tour { display: flex; align-items: center; gap: 24px; padding: 16px 20px; background: var(--card-2);
   border: 1px solid var(--line); border-radius: 12px; margin: 0 0 16px; }
 .heart-tour > div:first-child { flex: 1; min-width: 0; }

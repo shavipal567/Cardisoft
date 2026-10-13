@@ -3,6 +3,7 @@ import type { RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { ANATOMY_LANDMARKS } from "../anatomy/exploration";
+import { heartPartAnchor } from "../anatomy/heartPartAnchors";
 
 // One DOM overlay shares the viewport coordinate system with the export canvas.
 export type AnatomyOverlayRef = RefObject<HTMLDivElement | null>;
@@ -11,10 +12,13 @@ export function AnatomyProjection({ heart, overlay }: { heart: THREE.Object3D; o
     const ray = new THREE.Raycaster();
     return ANATOMY_LANDMARKS.map((landmark) => {
       const normal = new THREE.Vector3(...landmark.normal).normalize();
-      const seed = new THREE.Vector3(...landmark.seed);
-      ray.set(seed.clone().addScaledVector(normal, 3), normal.clone().negate());
-      const hit = ray.intersectObject(heart, true)[0];
-      return { ...landmark, normal, anchor: hit?.point.clone().addScaledVector(normal, 0.025) };
+      let anchor = landmark.parts ? heartPartAnchor(landmark.parts, landmark.edge) : null;
+      if (!anchor) {
+        const seed = new THREE.Vector3(...landmark.seed);
+        ray.set(seed.clone().addScaledVector(normal, 3), normal.clone().negate());
+        anchor = ray.intersectObject(heart, true)[0]?.point.clone();
+      }
+      return { ...landmark, normal, anchor: anchor?.addScaledVector(normal, 0.025) };
     });
   }, [heart]);
   const projected = useMemo(() => new THREE.Vector3(), []);

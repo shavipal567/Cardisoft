@@ -3,19 +3,18 @@ import type { RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { Vessel } from "../api";
-import { LABEL_FRACTION, loadCoronaries, VESSELS } from "../anatomy/coronary";
+import { VESSELS } from "../anatomy/coronary";
+import { HEART_PART_ANCHORS } from "../anatomy/heartPartAnchors";
 
 export type LabelElements = RefObject<Partial<Record<Vessel, HTMLButtonElement>>>;
 export default function VesselLabels({ labels, leaders, transparent }: {
   labels: LabelElements; leaders: RefObject<SVGSVGElement | null>; transparent: boolean;
 }) {
   const anchors = useMemo(() => {
-    const routes = loadCoronaries().routes;
     return VESSELS.map((name) => {
-      const route = routes[name], index = Math.round(LABEL_FRACTION[name] * (route.points.length - 1));
-      const anchor = route.points[index], normal = route.normals[index];
+      const { anchor, normal } = HEART_PART_ANCHORS[name];
       const position = anchor.clone().addScaledVector(normal, .3);
-      position.x += name === "RCA" ? -.23 : .23;
+      position.x += name === "RCA" ? -.18 : .18;
       if (name === "LCX") position.y += .1;
       return { name, anchor, position, normal };
     });
