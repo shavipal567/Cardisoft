@@ -1,5 +1,7 @@
 # Frontend — Cardisoft dashboard
 
+![Cardisoft assessment form](../docs/assets/img/screenshots/assessment-form.png)
+
 React + TypeScript + Vite, Recharts, and React Three Fiber. The dashboard
 collects patient measurements, imports text PDFs and report images, requests four predictions,
 and links the selected vessel to its explanation and schematic 3D heart.

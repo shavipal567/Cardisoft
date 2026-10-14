@@ -3,6 +3,11 @@
 These are fictional, printed-English test fixtures for Cardisoft's report importer.
 The numbers are test inputs, not diagnoses or clinical recommendations.
 
+<img src="01-complete-report.png" alt="Fictional complete Cardisoft report-import test fixture" width="320">
+
+*Example fixture. The six images below cover complete, negative, partial,
+invalid, unmatched and blank report cases.*
+
 Download [all six PNGs and expected results](dummy-report-pngs.zip), or use an
 individual image below. With Vite running, they are also available at
 `http://localhost:5173/sample-reports/<filename>`.

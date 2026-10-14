@@ -1,5 +1,10 @@
 # Prediction API
 
+![Confusion matrices for the checked-in baseline serving models](artifacts/confusion_matrices.png)
+
+*Evaluation snapshot for the currently checked-in baseline artifacts; these are
+historical holdout results, not a new validation run.*
+
 FastAPI serves the frozen model bundles from `backend/artifacts/`. Its inference
 and preprocessing runtime is copied into this directory, so the backend can be
 deployed with `backend/` as the project root. `backend/inference.py` loads the
