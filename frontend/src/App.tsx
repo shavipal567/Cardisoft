@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useRef, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowDown,
+  BookOpen,
   CalendarDays,
   ChevronsDown,
   ChevronsUp,
@@ -413,6 +414,16 @@ export default function App() {
       <header className="top">
         <Logo />
         <div className="controls">
+          <a
+            className="theme-toggle docs-link"
+            href="https://cardisoft-docs.onrender.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Cardisoft documentation (opens in a new tab)"
+          >
+            <Icon component={BookOpen} size={18} />
+            Docs
+          </a>
           <div className="seg" role="group" aria-label="Choose view">
             <button
               className={clinician ? "on" : ""}

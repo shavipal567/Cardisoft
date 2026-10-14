@@ -1,5 +1,7 @@
 # Technical documentation
 
+![Cardisoft's schematic heart visualization](assets/img/screenshots/heart-anatomy.png)
+
 This folder contains the MkDocs site. [index.md](index.md) is the site home;
 this README is a repository navigation guide and is excluded from the build.
 
