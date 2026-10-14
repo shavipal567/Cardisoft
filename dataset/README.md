@@ -1,5 +1,10 @@
 # Dataset and feature analysis
 
+![Distributions of selected engineered features in the development partition](../docs/assets/img/dataset/feature-distributions.png)
+
+*Exploratory feature distributions; see the notebook for partition details and
+the limits of this analysis.*
+
 `dataset.csv` is the original 303-record, 59-column clinical table. The feature
 pipeline reads this source; generated columns are calculated inside preprocessing
 rather than appended to the training CSV.

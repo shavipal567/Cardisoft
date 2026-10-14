@@ -13,7 +13,7 @@ router = APIRouter()
 @router.post("/predict")
 def predict(patient: PatientInput):
     if not available():
-        raise HTTPException(status_code=503, detail="Model artifacts not found. Run training/train.py first.")
+        raise HTTPException(status_code=503, detail="Prediction model artifacts are unavailable.")
     try:
         features = patient.to_feature_dict()
         result = predict_patient(features)

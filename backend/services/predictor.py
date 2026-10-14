@@ -1,10 +1,5 @@
-"""Thin wrapper over training/inference.py (frozen artifacts, no fitting)."""
+"""Thin wrapper over the backend's self-contained inference runtime."""
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "training"))
-
-from inference import available, predict_patient  # noqa: E402
+from inference import available, predict_patient
 
 __all__ = ["available", "predict_patient"]

@@ -11,7 +11,7 @@ use_directory_urls: true
 theme:
   name: material
   custom_dir: docs/overrides
-  logo: assets/img/logo.svg
+  logo: assets/img/cardisoft-heart.png
   favicon: assets/img/favicon.svg
   palette:
     - scheme: default
@@ -64,11 +64,12 @@ plugins:
 
 nav:
   - Home: index.md
+  - Product Tour: showcase.md
   - Problem Formulation: problem-formulation.md
   - Dataset: dataset.md
   - Preprocessing: preprocessing.md
   - Feature Engineering: feature-engineering.md
-  - Multimodal Fusion: multimodal-fusion.md
+  - Multimodal Input & Fusion: multimodal-fusion.md
   - Models: models.md
   - Evaluation: evaluation.md
   - CAD Nested Validation: cad-nested-validation.md

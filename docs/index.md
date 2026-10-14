@@ -1,7 +1,15 @@
 <div class="cardisoft-hero">
+<div class="cardisoft-brand" aria-label="Cardisoft — Heart risk, explained">
+<img class="cardisoft-brand-heart" src="assets/img/cardisoft-heart.png" alt="" />
+<div class="cardisoft-brand-copy">
+<div class="cardisoft-brand-word">Cardi<span>soft</span></div>
+<div class="cardisoft-brand-tag">Heart risk, explained</div>
+<img class="cardisoft-brand-bow" src="assets/img/cardisoft-stethoscope-bow.png" alt="" />
+</div>
+</div>
 <h1>Cardisoft docs</h1>
 <p>Technical documentation for the cardiovascular risk visualization &amp; prediction
-system (Multimodal AI Hackathon 2026 — Track A).</p>
+system.</p>
 <div class="cardisoft-badges">
 <span>303 patients</span>
 <span>4 prediction heads</span>
@@ -15,6 +23,9 @@ features. The checked-in serving models still use baseline inputs; their test
 scores below have not been regenerated with engineered features. Start with
 [feature engineering](feature-engineering.md) for the implementation and
 [evaluation](evaluation.md) for the evidence.
+
+Want to see the application before the technical details? Take the
+[product tour](showcase.md) for screenshots, a sample workflow, and API calls.
 
 <div class="grid cards" markdown>
 
@@ -47,10 +58,10 @@ scores below have not been regenerated with engineered features. Start with
 
     [Read the feature guide](feature-engineering.md)
 
--   **Multimodal Fusion**
+-   **Multimodal Input & Fusion**
 
-    Current unimodal (tabular-only) state and the design for where new modalities
-    (ECG waveforms, echo imaging) would plug in without breaking leakage guarantees.
+    Speech transcription, report OCR, and PDF text import flow into reviewed
+    structured fields. See how these inputs relate to model-level fusion.
 
     [See the design](multimodal-fusion.md)
 

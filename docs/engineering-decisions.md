@@ -107,8 +107,8 @@ also require raw explanation backgrounds and preserve a feature schema.
 `ARTIFACTS_DIR` selects an alternate bundle for inference/backend consumers;
 it does not redirect legacy training or evaluation output. Restart the API after replacing cached artifacts.
 
-**Why**: The hackathon demo must work without a 2-hour training run. Committed
-artifacts mean `pip install + uvicorn` is sufficient.
+**Why**: The demo must work without a 2-hour training run. Committed artifacts
+mean `pip install + uvicorn` is sufficient.
 
 **Trade-off**: Binary artifacts in git bloat the repository (~8 MB). Accepted
 for demo reliability. Git LFS could be a future improvement.
@@ -200,8 +200,11 @@ text PDFs while preserving the existing import workflow and provenance badges.
 **Trade-off**: The frontend deployment includes OCR assets, and the first image
 takes longer to process. Recognition depends on image quality and printed English
 text; matching rules do not cover every form field or convert units. File/image
-limits, cancellation and an OCR timeout bound the work. This is document text
-extraction, not diagnostic image analysis or a new prediction modality.
+limits, cancellation and an OCR timeout bound the work. This is multimodal input
+and document text extraction: report images are transcribed into text, then
+mapped to reviewed structured fields. The prediction models receive those
+fields rather than report pixels or image embeddings; the importer does not
+perform diagnostic image analysis.
 
 ## Schematic visualization and honest reporting
 

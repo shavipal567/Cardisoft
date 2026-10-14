@@ -1,0 +1,29 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "frontend": {
+      "root": "frontend/"
+    },
+    "backend": {
+      "root": "backend/",
+      "entrypoint": "main:app",
+      "framework": "fastapi",
+      "functions": {
+        "main.py": {
+          "maxDuration": 300,
+          "includeFiles": "{artifacts/**,data/dataset.csv,native_models.py,voting.py,stacking.py,ensemble_cv.py}"
+        }
+      }
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": { "service": "backend" }
+    },
+    {
+      "source": "/(.*)",
+      "destination": { "service": "frontend" }
+    }
+  ]
+}

@@ -5,16 +5,13 @@ No SHAP/numba dependency and no substitution with global feature importance.
 Categorical encodings move together, preserving valid one-hot combinations.
 """
 from functools import lru_cache
-from pathlib import Path
-import sys
 
 import numpy as np
 import pandas as pd
 import joblib
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "training"))
-from inference import artifacts_dir, get_artifact, transformed_row  # noqa: E402
-from preprocessing import ALL_INPUT_FEATURES, ENGINEERED_FEATURES, clean_dataframe  # noqa: E402
+from inference import artifacts_dir, get_artifact, transformed_row
+from preprocessing import ALL_INPUT_FEATURES, ENGINEERED_FEATURES, clean_dataframe
 
 BACKGROUND_ROWS = 16
 ORDER_PAIRS = 4

@@ -18,7 +18,7 @@ from inference import TARGET_KEYS, get_artifact
 from preprocessing import ALL_INPUT_FEATURES, TARGETS, clean_dataframe, split_features_target
 from schemas import PatientInput
 
-DATASET = Path(__file__).resolve().parents[2] / "dataset" / "dataset.csv"
+DATASET = Path(__file__).resolve().parents[1] / "data" / "dataset.csv"
 logger = logging.getLogger(__name__)
 
 

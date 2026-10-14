@@ -1,88 +1,165 @@
 # Problem formulation
 
-Source of truth: `../PROBLEM.md` (challenge spec, 35 sections). This page is the
-one-paragraph-per-question digest.
+## Motivation
 
-## What are we predicting?
+Cardisoft turns structured patient measurements into predictions for overall
+coronary artery disease (CAD) and stenosis in three named coronary vessels, then
+makes those outputs easier to inspect through patient-specific explanations and
+an interactive anatomical view.
 
-Four binary targets from structured clinical data (dataset: 303 patients):
+A set of isolated labels or percentages is difficult to interpret in context.
+The system therefore connects four parts of the problem: leakage-resistant
+prediction, explanations of model behavior, a vessel-specific visual mapping,
+and a usable web application. Its visual layer adds anatomical context; it does
+not locate a patient's plaque or reconstruct that patient's coronary anatomy.
 
-| Head | CSV column | Positive label | Prevalence | Clinical meaning |
-|---|---|---|---|---|
-| CAD (overall) | `Cath` → `CAD` | coronary disease (≥50% narrowing in ≥1 major vessel) | 71.3% | Any significant coronary artery disease |
-| LAD stenosis | `LAD` → `Stenotic` | left anterior descending narrowing | 58.4% | Disease in the "widow-maker" artery |
-| LCX stenosis | `LCX` → `Stenotic` | left circumflex narrowing | 39.3% | Disease in the left circumflex artery |
-| RCA stenosis | `RCA` → `Stenotic` | right coronary artery narrowing | 37.6% | Disease in the right coronary artery |
+## Objective
 
-Each head outputs `{prediction: 0/1, probability: 0.00–1.00}` using the threshold
-saved with its model, defaulting to 0.5. Voting winners save a tuned threshold;
-the current CatBoost/Random Forest winners all use 0.5.
-Probabilities are model scores, **not** medically validated risk percentages
-unless calibrated and validated as such (PROBLEM.md §11).
+For the clinical fields available for a patient, estimate four binary outcomes:
 
-## Required pipeline
+1. Whether the dataset labels the patient as having overall CAD.
+2. Whether the dataset labels stenosis in the left anterior descending artery
+   (LAD).
+3. Whether it labels stenosis in the left circumflex artery (LCX).
+4. Whether it labels stenosis in the right coronary artery (RCA).
+
+For every target, return a binary classification and a model probability. Show
+which inputs contributed to an explanation, and associate each vessel estimate
+with its corresponding structure in the schematic heart. Keep the output
+inspectable and clearly separate statistical estimates from clinical diagnosis
+or medical advice.
+
+## Dataset and target definitions
+
+The source cohort contains **303 records and 59 columns**: 54 allowed clinical
+inputs, four target labels, and one constant field that is dropped. The inputs
+cover demographics, history, examination, symptoms, ECG findings, laboratory
+measurements, and echocardiography. See the [dataset guide](dataset.md) for
+column groups, cohort exploration, label balance, and data quirks.
+
+| Model head | Dataset label | Positive class | Positive records |
+|---|---|---|---:|
+| Overall CAD | `Cath` | CAD; the dataset definition corresponds to at least 50% narrowing in one or more major vessels | 216 (71.3%) |
+| LAD | `LAD` | Stenotic | 177 (58.4%) |
+| LCX | `LCX` | Stenotic | 119 (39.3%) |
+| RCA | `RCA` | Stenotic | 114 (37.6%) |
+
+These labels and prevalences describe this cohort. They are not population
+prevalence estimates. The CAD label is strongly related to the three vessel
+labels, so leakage controls and evaluation design are essential.
+
+## Inputs and user workflow
+
+The prediction contract consists of the 54 allowed structured clinical fields.
+The web app lets users enter them in the form, speak or type a description, or
+import measurements from a selectable-text PDF or report image. Speech
+recognition, PDF extraction, and image OCR help convert those sources into
+candidate form values. Users review and apply the extracted values; the backend
+receives structured measurements only when an assessment is submitted. See the
+[multimodal input guide](multimodal-fusion.md) for processing and data-flow
+details.
+
+The clinical inputs describe information such as age, history, blood pressure,
+pulse, symptoms, ECG findings, laboratory values, and echocardiography
+measurements. The exact allow-list and field validation rules are documented in
+the [API reference](api.md#post-predict).
+
+## Prediction and preprocessing requirements
+
+The training and serving pipeline must use the same documented input contract
+and fitted preprocessing. For each prediction head, the labels `LAD`, `LCX`,
+`RCA`, and `Cath` are excluded from the model inputs. The current row-wise
+features are derived only from the allowed clinical fields; learned imputation,
+scaling, encoding, and other transformations are fitted within training folds.
+This prevents a model from receiving the answer directly or benefiting from
+statistics calculated using held-out records. See
+[preprocessing](preprocessing.md) and [engineering decisions](engineering-decisions.md).
 
 ```text
-Clinical data → raw input allow-list (exclude labels) → row-wise feature engineering
-  → fold-fitted imputation / scaling / encoding → CAD model + vessel models (LAD/LCX/RCA) → probabilities
-  → explainability + 3D mapping → clinical dashboard (FastAPI + frontend)
+Form, speech, typed description, PDF, or report image
+                         │
+             reviewed structured field values
+                         │
+       validation → row-wise feature engineering
+                         │
+        fold-fitted preprocessing → four model heads
+                         │
+      CAD + LAD + LCX + RCA estimates and explanations
+                         │
+           dashboard and vessel-level 3D context
 ```
 
-Weights: predictive performance 30%, 3D visualization 25%, interpretability
-20%, system integration 15%, technical implementation 10%.
+Each head retains a separate target and output. The classification threshold is
+read from the saved model metadata; the currently checked-in serving models use
+0.5. A probability is the model's output score. It must not be presented as a
+clinically validated individual risk percentage unless calibration and
+appropriate clinical validation support that interpretation.
 
-## Hard constraints
+## Validation and evidence
 
-1. **Leakage**: `LAD, LCX, RCA, Cath` must never be model inputs for any head
-   (§6). Enforced in `training/preprocessing.py`, verified post-training.
-2. **No lesion localization**: the tabular dataset has no lesion coordinates,
-   plaque geometry, or imaging. Highlighting LAD means "elevated predicted LAD
-   stenosis probability" — never "plaque found here" (§15, §27).
-3. **Explanations ≠ causality**: SHAP contributions describe the model, not the
-   patient's biology (§20).
-4. **Disclaimer visible** in the interface (§26); also carried by `GET /health`.
+The cohort is small and the targets are imbalanced, so training performance
+alone is inadequate. The project uses target-specific stratified development
+and held-out partitions, with transformations fitted on training data. Model
+selection and feature experiments use development records; held-out records
+are reserved for evaluation. Report accuracy, precision, recall, F1, ROC-AUC,
+and confusion matrices separately for CAD, LAD, LCX, and RCA.
 
-## Clinical context
+The [evaluation page](evaluation.md) documents the split, exact held-out metrics,
+the engineered-feature experiment, and its limitations. Cohort evaluation
+describes performance across historical records. It does not establish whether
+one patient's prediction is correct. Input-dependent cohort accuracy,
+completeness, and the patient's model probability are distinct quantities.
 
-Coronary artery disease (CAD) is the leading cause of death worldwide. Early
-identification of patients at risk for significant stenosis (>50% narrowing)
-can guide decisions about further testing (stress testing, coronary CT
-angiography) and lifestyle/medical intervention.
+## Explanation and vessel visualization
 
-The Z-Alizadeh Sani dataset contains 303 patient records with demographics,
-cardiovascular risk factors, symptoms, ECG findings, laboratory values, and
-echo measurements. The goal is to predict:
-- Whether a patient has CAD overall (Cath label)
-- Which specific coronary arteries are stenotic (LAD, LCX, RCA labels)
+The dashboard should answer two related questions: what estimate did each head
+produce, and how did the model respond to the submitted inputs? Cardisoft shows
+CAD and vessel estimates with patient-specific grouped permutation Shapley
+contributions. Contributions describe model behavior; they do not establish
+biological cause, treatment effect, or clinical importance. Read the
+[explainability guide](explainability.md) for the method and its limitations.
 
-This is a **decision-support tool**: it provides predictions and explanations
-to assist clinicians, not to replace clinical judgment.
-
-## Current scope status
-
-Built: leakage-safe training (`training/`), FastAPI predict/explain
-(`backend/`), evaluation + metrics, React dashboard with patient form, text-PDF
-and report-image import, risk cards, accuracy measured with the supplied fields available,
-per-vessel explanations, and the schematic 3D
-heart (`frontend/`). See [visualization](visualization.md) for the 3D
+The interactive 3D view maps LAD, LCX, and RCA estimates to their named vessel
+structures. Vessel color and displayed probability communicate the model
+estimate, not measured narrowing. The source cohort has no lesion coordinates,
+plaque geometry, CT angiography, or patient-specific anatomical segmentation.
+Therefore, the application must not claim that it found an exact lesion
+location, size, or morphology. The heart is a schematic orientation aid. See
+[visualization](visualization.md) for the asset, mapping, and interaction
 contract.
 
-The [input-dependent accuracy check](evaluation.md#accuracy-with-available-inputs)
-measures cohort performance after default substitution. It is separate from
-prediction probability and input completeness, and does not establish the
-correctness of an individual prediction.
+## Safety and intended use
 
-CAD calibration and rigorous nested evaluation are available as
-[isolated experiments](cad-nested-validation.md); serving models are unchanged.
-Eight derived formulas are implemented inside saved preprocessors: three
-ratios, two counts and three log transforms. New training uses target-specific
-feature sets while preserving the 54-field API. The checked-in serving models
-remain baseline models pending retraining and evaluation. See
-[Feature engineering](feature-engineering.md).
+Cardisoft is a research and demonstration prototype. It is not an independent
+diagnostic system, does not replace a cardiologist or clinical assessment, and
+does not recommend treatment. The interface must keep a clear safety notice
+visible. Explanations are not causal claims, and highlighting a vessel means
+only that the corresponding model estimated a vessel-level probability.
 
-Backlogged: vessel calibration, vessel-dependence modeling (classifier chains,
-CAD-as-OR), external validation. See
-`training/IMPROVEMENTS.md`.
+## Scope and status
 
-Explicitly out of scope: medical diagnosis, lesion localization, treatment
-recommendations, replacement of clinical judgment.
+Implemented components include the leakage-controlled training and inference
+pipeline, four prediction heads, FastAPI service, React dashboard, report import
+and speech-assisted field entry, patient-specific explanations, cohort
+evaluation panels, and schematic interactive 3D heart. New training supports
+target-specific engineered feature sets; checked-in serving artifacts remain
+baseline models. Calibration and nested CAD evaluation are available as
+isolated experiments. Vessel calibration, modeling dependence among vessel
+targets, and external validation remain future work. Details and evidence are
+linked throughout this documentation.
+
+## System goals
+
+The system brings together five areas:
+
+| Category | Weight | Evidence expected |
+|---|---:|---|
+| Predictive performance | 30% | Appropriate validation, leakage controls, and per-target classification metrics |
+| 3D visualization | 25% | Clear anatomy, correct vessel mapping, interaction, and responsive updates |
+| Clinical interpretability | 20% | Patient-specific model explanations and clear communication of estimates |
+| System integration | 15% | Working data, model, API, frontend, and visualization flow |
+| Technical implementation | 10% | Reproducibility, maintainability, documentation, and asset attribution |
+
+The intended result is an understandable, inspectable, anatomically contextual
+view of model estimates, with a firm boundary between machine-learning output
+and clinical diagnosis.

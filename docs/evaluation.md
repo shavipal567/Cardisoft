@@ -56,6 +56,12 @@ three repeats of five-fold CV (seeds 42, 43 and 44). Across four targets and six
 sets this produces 360 fits and 17,424 out-of-fold probability rows. Models are
 not retuned and the reserved 61 rows are not scored by this experiment.
 
+![Repeated development CV comparison of ROC-AUC and log loss across engineered feature sets](assets/img/dataset/cv-feature-set-comparison.png)
+
+*Each point is the mean for one complete five-fold out-of-fold repeat (seeds
+42, 43, and 44). The chart summarizes the development experiment and does not
+show held-out test performance.*
+
 Accuracy below was calculated afterward from the exported OOF probabilities
 at threshold 0.5, averaging the three complete-repeat accuracies:
 
@@ -78,6 +84,12 @@ The original notebook ranks **log loss**, which gives different winners:
 | LAD | `ratios_counts_logs` | .51957 | .51236 |
 | LCX | `counts` | .61068 | .60565 |
 | RCA | `ratios_counts` | .60816 | .60123 |
+
+![Per-repeat out-of-fold log-loss change for engineered feature sets relative to baseline](assets/img/dataset/cv-log-loss-deltas.png)
+
+*Negative changes favor the feature set shown. Individual repeats vary, so the
+points should be read alongside the averages above, not as confidence
+intervals.*
 
 These small differences describe this experiment. Defaults were chosen after
 inspecting development results, so these scores are not independent estimates
@@ -336,10 +348,3 @@ Missing resources return `status: unavailable` while predictions can still
 succeed. Older API responses without this field also show an unavailable message.
 See the [response fields](api.md#accuracy-with-available-inputs) and
 [cache/service reference](api-reference/backend.md#servicesinput_validationpy).
-
-## Outstanding deliverables
-
-- Calibration plots, ROC/PR curves
-- External validation on a separate cohort
-- The six-page submission document
-- Demonstration video (3-10 minutes)

@@ -1,5 +1,10 @@
 # Training and inference
 
+![Confusion matrices for the checked-in CAD and vessel models](artifacts/confusion_matrices.png)
+
+*Historical seed-42 holdout snapshot for the baseline serving artifacts described
+below; the plot is not an independent external validation.*
+
 This directory owns feature engineering, model fitting, evaluation and frozen
 inference for CAD and the three vessel targets. The backend loads its artifacts;
 HTTP requests never fit models or choose a feature set.

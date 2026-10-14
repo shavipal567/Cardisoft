@@ -1,8 +1,15 @@
 # Prediction API
 
-FastAPI serves the frozen model bundles from `training/artifacts/`. The shared
-`training/inference.py` loads preprocessors/models and applies their saved
-thresholds. HTTP handlers do not fit models or select features.
+![Confusion matrices for the checked-in baseline serving models](artifacts/confusion_matrices.png)
+
+*Evaluation snapshot for the currently checked-in baseline artifacts; these are
+historical holdout results, not a new validation run.*
+
+FastAPI serves the frozen model bundles from `backend/artifacts/`. Its inference
+and preprocessing runtime is copied into this directory, so the backend can be
+deployed with `backend/` as the project root. `backend/inference.py` loads the
+local preprocessors/models and applies their saved thresholds. HTTP handlers do
+not fit models or select features.
 
 ## Start the service
 
@@ -17,8 +24,14 @@ python3 -m uvicorn main:app --host 127.0.0.1 --port 8000
 Interactive API documentation: `http://127.0.0.1:8000/docs`.
 `ARTIFACTS_DIR` can point inference to another complete, compatible four-target
 bundle. Restart the service after replacing artifacts; models and explanation
-backgrounds are cached. The source CSV for input-dependent accuracy remains
-`dataset/dataset.csv` regardless of that setting.
+backgrounds are cached. Input-dependent accuracy reads the packaged
+`backend/data/dataset.csv` copy.
+
+These serving files are snapshots of the repository-level training outputs. The
+ensemble adapter modules are also required because saved joblib models refer to
+their Python module names when loading. After retraining, refresh those copied
+runtime modules, the complete `training/artifacts/` directory, and
+`dataset/dataset.csv` under `backend/` before deploying the updated bundle.
 
 ## Inputs and engineered features
 
