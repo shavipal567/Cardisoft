@@ -1,4 +1,3 @@
-# Multimodal AI Hackathon 2026 — Track A
 # Cardiovascular Risk Visualization & Prediction
 
 ## 1. Problem Statement

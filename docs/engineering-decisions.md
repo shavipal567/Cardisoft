@@ -107,8 +107,8 @@ also require raw explanation backgrounds and preserve a feature schema.
 `ARTIFACTS_DIR` selects an alternate bundle for inference/backend consumers;
 it does not redirect legacy training or evaluation output. Restart the API after replacing cached artifacts.
 
-**Why**: The hackathon demo must work without a 2-hour training run. Committed
-artifacts mean `pip install + uvicorn` is sufficient.
+**Why**: The demo must work without a 2-hour training run. Committed artifacts
+mean `pip install + uvicorn` is sufficient.
 
 **Trade-off**: Binary artifacts in git bloat the repository (~8 MB). Accepted
 for demo reliability. Git LFS could be a future improvement.
