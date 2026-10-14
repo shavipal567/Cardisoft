@@ -9,7 +9,7 @@
 </div>
 <h1>Cardisoft docs</h1>
 <p>Technical documentation for the cardiovascular risk visualization &amp; prediction
-system (Multimodal AI Hackathon 2026 — Track A).</p>
+system.</p>
 <div class="cardisoft-badges">
 <span>303 patients</span>
 <span>4 prediction heads</span>

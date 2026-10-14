@@ -1,13 +1,11 @@
 # Problem formulation
 
-## Challenge and motivation
+## Motivation
 
-Cardisoft was developed for the **Multimodal AI Hackathon 2026, Track A:
-Cardiovascular Risk Visualization & Prediction**. The challenge is to turn
-structured patient measurements into predictions for overall coronary artery
-disease (CAD) and stenosis in three named coronary vessels, then make those
-outputs easier to inspect through patient-specific explanations and an
-interactive anatomical view.
+Cardisoft turns structured patient measurements into predictions for overall
+coronary artery disease (CAD) and stenosis in three named coronary vessels, then
+makes those outputs easier to inspect through patient-specific explanations and
+an interactive anatomical view.
 
 A set of isolated labels or percentages is difficult to interpret in context.
 The system therefore connects four parts of the problem: leakage-resistant
@@ -150,9 +148,9 @@ isolated experiments. Vessel calibration, modeling dependence among vessel
 targets, and external validation remain future work. Details and evidence are
 linked throughout this documentation.
 
-## Challenge success criteria
+## System goals
 
-The hackathon evaluates the complete system across five areas:
+The system brings together five areas:
 
 | Category | Weight | Evidence expected |
 |---|---:|---|

@@ -4,8 +4,8 @@ Cardisoft predicts CAD and LAD/LCX/RCA stenosis from structured clinical
 measurements. It combines a FastAPI prediction service, a React dashboard,
 patient-specific explanations and a schematic 3D heart.
 
-Built for the Multimodal AI Hackathon 2026, Track A. This is a research prototype;
-its predictions are not a medical diagnosis or lesion-location estimate.
+This is a research prototype; its predictions are not a medical diagnosis or
+lesion-location estimate.
 
 ![Cardisoft assessment form in labeled offline demo mode](docs/assets/img/screenshots/assessment-form.png)
 
