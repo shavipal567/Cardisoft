@@ -7,6 +7,8 @@ patient-specific explanations and a schematic 3D heart.
 This is a research prototype; its predictions are not a medical diagnosis or
 lesion-location estimate.
 
+REPORT.pdf is the submission DOCUMENT for the project
+
 ![Cardisoft assessment form in labeled offline demo mode](docs/assets/img/screenshots/assessment-form.png)
 
 See the [product tour](docs/showcase.md) for more screenshots, a guided workflow,
