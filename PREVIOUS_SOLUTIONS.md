@@ -1,1 +1,0 @@
-https://www.kaggle.com/code/edudum/statistical-analysis-of-cad-dataset

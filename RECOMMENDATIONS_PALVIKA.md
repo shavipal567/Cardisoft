@@ -1,1 +1,0 @@
-i) automatically scan pdf files and fill the values

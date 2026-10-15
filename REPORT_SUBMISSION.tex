@@ -1,0 +1,195 @@
+\documentclass[10pt]{article}
+
+% ---------- Page layout: standard two-column research paper ----------
+\usepackage[letterpaper,top=0.8in,bottom=0.9in,left=0.75in,right=0.75in,columnsep=0.25in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{mathptmx}          % Times-like text and math
+\usepackage[scaled=0.9]{helvet}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[font=small,labelfont=bf,labelsep=period]{caption}
+\usepackage{titlesec}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+
+\setlength{\parindent}{1em}
+\setlength{\parskip}{0pt}
+\setlength{\emergencystretch}{2em}
+\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\floatsep}{8pt plus 2pt minus 2pt}
+\setlength{\intextsep}{8pt plus 2pt minus 2pt}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.9}
+\renewcommand{\textfraction}{0.08}
+\renewcommand{\floatpagefraction}{0.8}
+\renewcommand{\dblfloatpagefraction}{0.8}
+\renewcommand{\dbltopfraction}{0.9}
+
+% Section styles
+\titleformat{\section}{\normalfont\bfseries\fontsize{10.5}{12}\selectfont\scshape}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalfont\bfseries\itshape\small}{\thesubsection}{0.5em}{}
+\titlespacing*{\section}{0pt}{1.1ex plus 0.4ex minus 0.2ex}{0.7ex plus 0.2ex}
+\titlespacing*{\subsection}{0pt}{0.9ex plus 0.3ex minus 0.2ex}{0.5ex plus 0.1ex}
+
+% Abstract styling
+\renewcommand{\abstractname}{Abstract}
+\makeatletter
+\renewenvironment{abstract}{%
+  \begin{center}\begin{minipage}{0.88\textwidth}
+  \small\noindent\textbf{\itshape\abstractname---}\ignorespaces}{%
+  \par\end{minipage}\end{center}}
+\makeatother
+
+\title{\Large\bfseries Cardisoft: Coronary Artery Disease Risk Estimation\\ and 3D Visualization}
+\author{Project Evaluation Report}
+\date{}
+
+\begin{document}
+
+\makeatletter
+\twocolumn[
+  \begin{@twocolumnfalse}
+    \maketitle
+    \vspace{-1.5em}
+    \begin{abstract}
+    Cardisoft is a research prototype that estimates coronary artery disease (CAD) and vessel-specific stenosis probabilities from structured clinical data. It combines four tabular classifiers with an interactive heart dashboard and patient-level feature explanations. Evaluation on the project's held-out test partitions shows the strongest discrimination for CAD and the left anterior descending artery (LAD); sensitivity is substantially lower for the left circumflex (LCX) and right coronary artery (RCA). The 3D display maps vessel probabilities to illustrative coronary routes, not to patient-specific lesion locations. Results are limited by the small, single-source cohort, uncalibrated serving probabilities, and absence of external validation. The system is a research and educational prototype, not a diagnostic device.
+
+    \medskip
+    \noindent\textbf{\itshape Index Terms---}coronary artery disease, stenosis prediction, tabular machine learning, SHAP explanations, 3D visualization, Z-Alizadeh Sani dataset.
+    \end{abstract}
+    \vspace{0.8em}
+  \end{@twocolumnfalse}
+]
+\makeatother
+
+% ============================================================
+\section{System Overview}
+The system uses the 303-row Z-Alizadeh Sani CAD dataset (\texttt{dataset/dataset.csv}), comprising 54 clinical inputs and four binary targets: CAD, LAD, LCX, and RCA. After removing four target-related columns and one constant field, the data undergoes category normalization and fitted preprocessing. A shared Python pipeline serves predictions through FastAPI to the dashboard. The dashboard displays vessel probabilities, risk estimates, feature explanations, and an interactive 3D heart with selectable LAD, LCX, and RCA reference routes. These routes are illustrative, not patient-specific lesion maps. Speech, text, and report import assist data entry; raw audio and medical images are not model inputs.
+
+\begin{figure*}[!t]
+    \centering
+    \includegraphics[width=0.9\textwidth]{system_overview.png}
+    \caption{Overview of the proposed CAD prediction system, illustrating dataset preprocessing, machine learning inference, FastAPI integration, and interactive dashboard visualization.}
+    \label{fig:overview}
+\end{figure*}
+
+% ============================================================
+\section{Dataset Preprocessing}
+The source cohort contains 303 records and 59 columns: 54 permitted predictors, four diagnosis labels, and one constant exertional-chest-pain field. The targets are Cath-derived CAD and LAD, LCX, and RCA stenosis. Their positive/negative counts are CAD 216/87, LAD 177/126, LCX 119/184, and RCA 114/189. All four targets and the constant field are excluded from predictors. The inputs include 33 numeric or binary-valued fields, 17 Y/N categorical fields, and four nominal fields (Sex, BBB, VHD, Region RWMA).
+
+\begin{figure*}[!t]
+    \centering
+    \includegraphics[width=1.0\textwidth]{variable_distributions.png}
+    \caption{Comparative boxplot distributions of selected clinical features
+in the original (blue) and Z-copied (green) datasets, illustrating
+differences in central tendency, variability, and outlier patterns.}
+    \label{fig:distributions}
+\end{figure*}
+
+Cleaning maps the dataset typo \texttt{Fmale} to \texttt{Female}; undocumented Region RWMA codes are treated as categories rather than an assumed severity scale. Numeric inputs use median imputation and RobustScaler; categoricals use most-frequent imputation. The one-hot track handles unseen categories with an all-zero encoded block. The native CatBoost/LightGBM track uses integer category codes and an unknown-level sentinel. No automatic outlier clipping is applied. These transforms are fitted within each training fold and saved with the final estimator, preventing validation records from influencing imputation, scaling, or category vocabularies.
+
+Training also supports ratios (LDL/HDL, TG/HDL, Neut/Lymph), two clinical finding counts, and $\log(1+x)$ transforms for TG, FBS, and ESR. Ratios and counts augment the numeric inputs; log transforms replace their original lab values. Invalid denominators and non-finite operands propagate as missing before imputation. Derived values are computed inside the fitted preprocessor, so the API still accepts exactly 54 raw fields. These feature options are available to new training runs; checked-in serving artifacts and the reported metrics use baseline inputs.
+
+% ============================================================
+\section{Model Architecture}
+Four independent binary estimators produce CAD, LAD, LCX, and RCA probabilities. Training compares 32 configurations per target from Random Forest, XGBoost, HistGradientBoosting, LightGBM, CatBoost, stacking, and soft voting. Mean ROC--AUC over ten repeats of five-fold CV selects a winner, with mean F1 as the tie-breaker. Class weighting addresses imbalance. The saved serving models are CatBoost for CAD (400 iterations, depth 4, learning rate 0.05, $L_2=3$, balanced weights) and Random Forest for all vessels (400 trees; minimum leaf size 2; RCA depth 8, LAD/LCX unrestricted depth). The CAD transformer produces 54 native columns; vessel transformers produce 81 one-hot columns.
+
+The persisted bundle contains estimators, preprocessors, metadata, feature schemas, and reference data for explanations. FastAPI loads the frozen artifacts at inference time; it does not fit models during requests. All models return a two-column probability array ordered by classes 0 and 1. A saved threshold of 0.5 determines the displayed binary classification. Independent heads are simple to maintain but do not explicitly model vessel co-occurrence. A separate nested CAD experiment evaluates training-only inner selection and outer-fold performance; it is not the serving bundle. Deployed probabilities remain uncalibrated.
+
+% ============================================================
+\section{Predictive Performance}
+\subsection{Validation and Results}
+Saved serving models were evaluated on target-specific, stratified 80/20 partitions (242 development and 61 held-out records per target; random seed 42). Model selection used repeated five-fold cross-validation on the development set. Preprocessing is fitted within folds, and held-out observations are not used for fitting. Table~\ref{tab:results} reports the current saved-artifact test results at the saved 0.5 decision threshold.
+
+\begin{table*}[!t]
+\centering
+\caption{Held-out test performance of the saved serving models (61 records per target, threshold 0.5).}
+\label{tab:results}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+Target & Accuracy & Precision & Recall & F1 & ROC--AUC & TN/FP/FN/TP \\
+\midrule
+CAD & .852 & .870 & .930 & .899 & .893 & 12/6/3/40 \\
+LAD & .787 & .795 & .861 & .827 & .843 & 17/8/5/31 \\
+LCX & .672 & .611 & .458 & .524 & .711 & 30/7/13/11 \\
+RCA & .672 & .600 & .391 & .474 & .748 & 32/6/14/9 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\begin{figure*}[!t]
+    \centering
+    \includegraphics[width=0.95\textwidth]{graphs_model.png}
+    \caption{Training (blue) and validation (orange) performance across 400 boosting iterations, evaluated using six metrics: logarithmic loss (Log Loss), ROC–AUC, PR–AUC (Average Precision), Accuracy, F1-score, and Brier score. The declining training loss and consistently high training metrics indicate progressive model fitting, while the increasing validation loss and relatively stable validation metrics suggest the onset of overfitting. Lower values indicate better performance for Log Loss and Brier score, whereas higher values are preferred for the remaining metrics.-}
+    \label{fig:modelperf}
+\end{figure*}
+
+CAD and LAD have stronger held-out discrimination in this cohort. At the fixed threshold, LCX and RCA miss 13 of 24 and 14 of 23 positive cases respectively. These results make the variation in vessel performance visible and argue against treating all four outputs as equally reliable. Each test partition is small and comes from the same source as development data; these measurements do not establish performance in another hospital or population.
+
+A separate completed CAD nested-validation experiment used ten seeds with five outer folds and inner model selection. For its nested candidate, mean outer ROC--AUC was 0.9280 (SD 0.0328), sensitivity 0.9201, specificity 0.7316, and log loss 0.3137. The baseline mean outer ROC--AUC was 0.9273 (SD 0.0304); the paired patient-bootstrap interval for the mean log-loss change was $[-0.0639,\,+0.0123]$, which includes zero. This experiment is useful methodological evidence but does not replace the serving metrics or establish a generalization improvement. Serving models remain uncalibrated; their probability values must not be interpreted as clinically validated individual risk percentages.
+
+\subsection{Assessment}
+The project implements stratified held-out testing, repeated CV, fold-contained preprocessing, and a more rigorous nested CAD experiment. Reporting multiple metrics and confusion counts supports assessment beyond accuracy. Key limitations are the 61-patient test size per target, one dataset source, no independent external validation, and legacy model-selection results that may be optimistic after extensive exploration. Vessel-specific sensitivity in particular requires improvement and prospective evaluation before clinical use.
+
+% ============================================================
+\section{3D Visualization}
+The web dashboard renders an interactive heart asset with separate selectable LAD, LCX, and RCA reference-route overlays. Users can rotate and zoom, choose anterior, posterior, and lateral views, select a vessel, and inspect its probability and associated explanation. The routes are registered to the heart surface; a continuous color scale and numeric probability provide redundant risk cues. New prediction responses update the displayed vessel probabilities. The visual display is therefore integrated with model output and is interactive.
+
+\begin{figure}[!t]
+    \centering
+    \includegraphics[width=\columnwidth]{heart.png}
+    \caption{Interactive 3D heart visualization integrated into the CAD prediction dashboard, displaying anatomical reference structures and selectable coronary artery routes (LAD, LCX, and RCA). The interface supports anatomical exploration and contextual visualization of vessel-specific predictions. Highlighted arterial pathways are illustrative and do not represent patient-specific coronary lesions.}
+    \label{fig:heart}
+\end{figure}
+
+Anatomical claims are deliberately bounded. The underlying GLB is an illustrative heart model with generically named mesh chunks and no verified LAD/LCX/RCA segmentations. Coronary routes are manually registered reference illustrations based on normal anatomy, not clinically validated segmentations. The dataset contains no imaging, lesion coordinates, plaque geometry, or patient-specific anatomy. Accordingly, vessel highlighting communicates predicted vessel-level stenosis probability only; it does not locate or characterize a lesion. The dashboard includes appearance controls, labels, camera presets, and responsive layout, while retaining the numeric estimates in the interface.
+
+\subsection{3D Pipeline Setup}
+The heart model is sourced from BodyParts3D/Anatomography (\url{https://lifesciencedb.jp/bp3d/}) and loaded through React Three Fiber/Three.js. Asset-specific landmarks define LAD, LCX, and RCA reference routes. The registration process interpolates route samples and projects them to the heart surface; tapered tube meshes are rendered with selectable labels. LAD and LCX share an illustrative left-main origin, while RCA has a separate origin. The left-main connector stays neutral because no separate model output exists. On each prediction response, probabilities update route materials and numeric labels without rebuilding the heart geometry. A continuous colour scale applies one uniform value per vessel; there is no local plaque or lesion map.
+
+After changing route landmarks or the asset, run \texttt{npm run anatomy:register} and \texttt{npm run anatomy:check} from \texttt{frontend/}. These checks verify asset fingerprint, route continuity, origin, direction, and surface contact. They check geometry consistency, not clinical anatomical accuracy. The viewer supports rotate/zoom, anterior/posterior/lateral presets, vessel focus, appearance and opacity controls, and a responsive inspector. Risk estimates and the explanation table remain available independently of the 3D view.
+
+% ============================================================
+\section{Clinical Interpretability}
+For a selected target, the explanation service computes approximate permutation Shapley contributions in probability space. It returns signed feature contributions, raw feature values, a baseline estimate, and a residual for contributions outside the displayed top features. Features are grouped back to their original clinical fields, including one-hot encoded categories. This gives an individual assessment a ranked, directional account of which inputs moved the model prediction relative to its reference background. The dashboard presents the explanation alongside physiological field values, with clinician and patient wording modes.
+
+\begin{figure}[!t]
+    \centering
+    \includegraphics[width=\columnwidth]{shapley_water.png}
+    \caption{SHAP plots.}
+    \label{fig:shap}
+\end{figure}
+
+These are explanations of model behavior, not causal effects or independent evidence of disease mechanism. Contributions depend on the model, reference background, and correlated predictors; the permutation computation is approximate. Sparse categories and the small cohort can also make explanations unstable. The report should therefore be read as a transparent account of the model's estimate rather than a clinical rationale for treatment.
+
+% ============================================================
+\section{System Integration}
+The frontend submits structured patient inputs to the prediction API and receives CAD and vessel probabilities, effective and defaulted input values, model identities, and available-input validation context. A separate explanation endpoint supplies feature attributions for the selected output. Model information and held-out metrics are exposed through an API endpoint. The dashboard uses the returned probabilities to refresh risk cards and the 3D vessel overlays after each analysis. Form, speech/text parsing, OCR, and selectable-text PDF extraction converge on the same reviewed 54-field structured input contract.
+
+The pipeline is reproducible within the repository: dataset, training scripts, preprocessing, model artifacts, API services, frontend, evaluation outputs, and documentation are included. The available-input accuracy panel evaluates frozen models on reconstructed held-out cohort records after substituting defaults for fields not supplied. It is a cohort-level exploratory measurement, not confidence in an individual prediction. Imported values require user review before analysis; import does not itself trigger model inference.
+
+% ============================================================
+\section{Technical Implementation}
+The implementation separates training, inference, API, and browser visualization. Model artifacts retain metadata and feature schemas; the same preprocessing logic is shared across training and serving. Evaluation outputs and experiment provenance are stored with the project, while API validation constrains inputs to the documented schema. The use of a public tabular dataset and an attributed third-party heart asset supports reproducibility and resource attribution.
+
+% \begin{figure}[!t]
+%     \centering
+%     \includegraphics[width=\columnwidth]{api.png}
+%     \caption{CardiSoft API endpoints.}
+%     \label{fig:api}
+% \end{figure}
+\begin{figure}[!t]
+    \centering
+    \includegraphics[width=\columnwidth]{api_endpoints_2.png}
+    \caption{CardiSoft API Endpoints}
+    \label{fig:placeholder}
+\end{figure}
+Reproducibility does not resolve dataset provenance or transportability. The data contain 303 rows and no verified patient identifier or acquisition timestamp, so independence of repeated patients and pre-decision availability of every field cannot be established. The heart model has no clinically labelled coronary segmentation. These constraints, and the absence of external validation, are material technical and clinical limitations.
+
+% ============================================================
+\section{Conclusion and Next Steps}
+Cardisoft combines a functioning tabular prediction pipeline, patient-level explanations, and interactive 3D presentation. Its strongest current evidence is for CAD and LAD discrimination on the available cohort; LCX and RCA sensitivity is limited. The visualization provides spatial context but does not show patient-specific pathology. Priorities for further development are independent multi-site validation, stronger vessel-level sensitivity assessment, calibration studies on adequate samples, provenance review, and clinically reviewed coronary segmentations if patient-specific spatial claims are pursued. Until those steps are completed, Cardisoft should be used for research and education only.
+
+\end{document}
